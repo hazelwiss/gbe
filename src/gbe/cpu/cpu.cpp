@@ -33,7 +33,7 @@
 void gbe::cpu::emulate_fetch_decode_execute(){
 	//	Nothing yet!
 	//	Call function here!
-	parameter param;
+	parameter param{*this};
 	this->clock_ticks+=4;
 	instructions[this->regs.pc++%cpu::instruction_c](*this, param);
 }

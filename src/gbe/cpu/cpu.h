@@ -61,9 +61,13 @@ namespace gbe{
 		unsigned long long int clock_ticks{0};
 		//	Nested definition of the parameters used within the instruction_t type, that is used by the cpu instructions.
 		struct parameter{
+			inline parameter(cpu& owner) : owner{owner} {}
+		protected:
+			cpu& owner;
 			template<typename byte_t, typename word_t>
 			struct reg{
-				enum { BYTE = 0, WORD } TYPE_FLAG;
+				inline reg(cpu& owner) : owner{owner} {}
+			protected:
 				inline byte_t& get_byte(){
 					this->TYPE_FLAG = BYTE;
 					return r.b;
@@ -72,14 +76,16 @@ namespace gbe{
 					this->TYPE_FLAG = WORD;
 					return r.w;
 				}
-			protected:
 				union {
 					byte_t b;
 					const word_t w;
 				} r{0};
+				enum { BYTE = 0, WORD } TYPE_FLAG;
+				enum { REG, MEM } R_M_FLAG;
+				cpu& owner;
 			};
-			reg<ubyte, uword> dest; 
-			reg<const ubyte, const uword> src;
+			reg<ubyte, uword> dest{owner}; 
+			reg<const ubyte, const uword> src{owner};
 		};
 		//	Nested definiton of the instruction types and function table.
 		using instruction_t = void(*)(cpu&, parameter&);
