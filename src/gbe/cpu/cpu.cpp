@@ -1,190 +1,778 @@
 #include"cpu.h"
+#define INSTR [](gbe::cpu_t& cpu) noexcept
 
-#define INSTR [](gbe::cpu& cpu, gbe::cpu::parameter& param)
-#define PARAM_DEST_TO_BYTE param.dest.get_byte()
-#define PARAM_DEST_TO_WORD param.dest.get_word()
-#define PARAM_SRC_TO_BYTE param.src.get_byte()
-#define PARAM_SRC_TO_WORD param.src.get_word()
-#define LOAD_MEMORY(adr) cpu.load_memory(adr)
-#define WRITE_MEMORY(adr, value) cpu.write_memory(value, adr)
-#define LOAD_IMMEDIATE_BYTE LOAD_MEMORY(cpu.regs.pc+1)
-#define LOAD_IMMEDIATE_WORD cpu.load_memory_16bit(cpu.regs.pc+1)
-#define INCREMENT_WORD_REGISTER(reg) cpu.increment_16bit_register(reg)
-#define DECREMENT_WORD_REGISTER(reg) cpu.decrement_16bit_register(reg)
-#define WORD_LD(dest, src) cpu.write_to_16bit_register(dest, src)
-#define WORD_ALU(dest, src) cpu.alu_16bit_register(dest, src)
-#define FLAG_Z 0b1000-0000
-#define FLAG_N 0b0100-0000
-#define FLAG_H 0b0010-0000
-#define FLAG_C 0b0001-0000
-#define SET_FLAGS(flags) cpu.set_flags(flags)
-#define RESET_FLAGS_ALL cpu.reset_flags_all()
-#define RESET_FLAGS_OTHER(exclude) cpu.reset_flags_other(exclude)
-#define SET_CONDITIONAL_ZERO_FLAG(val) if(cpu.should_set_zero_flag(val)) SET_FLAGS(FLAG_Z)
-#define SET_CONDITIONAL_NEGATIVE_FLAG(left_operator, right_operator) if(cpu.should_set_negative_flag(left_operator, right_operator)) SET_FLAGS(FLAG_N)
-#define SET_CONDITIONAL_HALF_CARRY_FLAG(left_operator, right_operator) if(cpu.should_set_half_carry_flag(left_operator, right_operator)) SET_FLAGS(FLAG_H)
-#define SET_CONFITIONAL_CARRY_FLAG(left_operator, right_operator) if(cpu.should_set_carry_flag(left_operator, right_operator)) SET_FLAGS(FLAG_C)
-#define SET_CONDITIONAL_NOT_HALF_CARRY_FLAG(left_operator, right_operator) if(!cpu.should_set_half_carry_flag(left_operator, right_operator)) SET_FLAGS(FLAG_H)
-#define SET_CONDITIONAL_NOT_CARRY_FLAG(left_operator, right_operator) if(!cpu.should_set_carry_flag(left_operator, right_operator)) SET_FLAGS(FLAG_C)
-
-/*
-	Cycle emulation implementation.
-*/
-void gbe::cpu::emulate_fetch_decode_execute(){
-	//	Nothing yet!
-	//	Call function here!
-	parameter param{*this};
-	this->clock_ticks+=4;
-	instructions[this->regs.pc++%cpu::instruction_c](*this, param);
+void gbe::cpu_t::emulate_fetch_decode_execute_cycle(){
+	throw gbe_exception(gbe_error_codes::UNKNOWN);
 }
 
-/*
-	Memory functions
-*/
-const ubyte& gbe::cpu::load_memory(const uword& address){
-	this->clock_ticks+=4;
-}
-const uword& gbe::cpu::load_memory_16bit(const uword& address){
-	this->clock_ticks+=8;
-}
-void gbe::cpu::write_memory(const ubyte& data, const uword& address){
-	this->clock_ticks+= 4;
-}
-void gbe::cpu::write_memory_16bit(const uword& data, const uword& address){
-	this->clock_ticks+= 8;
-}
+gbe::cpu_t::instruction_t gbe::cpu_t::instructions[]{
+	{"NOP", 1, 4, INSTR{
 
-/*
-	Instructions implementation
-*/
-const gbe::cpu::instruction_t gbe::cpu::instructions[]{
-	/*
-		8-BIT LOAD INSTRUCTIONS
-	*/
-	INSTR{	//	LD nn, n : 8 cycles, 
-		PARAM_DEST_TO_BYTE = LOAD_IMMEDIATE_BYTE;	//	Or maybe it's -1?!
-	},
-	INSTR{	//	LD r1, r2 : 4-8 cycles
-		PARAM_DEST_TO_BYTE = PARAM_SRC_TO_BYTE;
-	},
-	INSTR{	//	LD A, n : 4, 8 - 16 cycles
-		cpu.regs.a = PARAM_SRC_TO_BYTE;
-	},
-	INSTR{	// LD n, A : 4, 8 - 16
-		PARAM_DEST_TO_BYTE = cpu.regs.a;
-	},
-	INSTR{	//	LD A, (0xFF00+C) : 8 cycles
-		cpu.regs.a = LOAD_MEMORY(0xFF00+cpu.regs.c);
-	},
-	INSTR{	//	LD (0xFF00+C), A : 8 cycles
-		WRITE_MEMORY(0xFF00+cpu.regs.c, cpu.regs.a);
-	},
-	INSTR{	//	LDD A, (HL) : 8 cycles
-		cpu.regs.a = LOAD_MEMORY(DECREMENT_WORD_REGISTER(cpu.regs.hl));
-	},
-	INSTR{	//	LDD (HL), A : 8 cycles
-		WRITE_MEMORY(DECREMENT_WORD_REGISTER(cpu.regs.hl), cpu.regs.a);
-	},
-	INSTR{	//	LDI A, (HL) : 8 cycles
-		cpu.regs.a = LOAD_MEMORY(INCREMENT_WORD_REGISTER(cpu.regs.hl));
-	},
-	INSTR{	//	LDI (HL), A : 8 cycles
-		WRITE_MEMORY(INCREMENT_WORD_REGISTER(cpu.regs.hl), cpu.regs.a);
-	},
-	INSTR{	//	LDH (n), A : 12 cycles
-		WRITE_MEMORY(0xFF00+LOAD_IMMEDIATE_BYTE, cpu.regs.a);
-	},
-	INSTR{	//	LDH A, (n) : 12 cycles
-		cpu.regs.a = LOAD_MEMORY(0xFF00+LOAD_IMMEDIATE_BYTE);
-	},
-	/*
-		16-BIT LOAD INSTRUCTIONS
-	*/
-	INSTR{	//	LD n, nn : 12 cycles
-		WORD_LD(PARAM_DEST_TO_WORD, PARAM_SRC_TO_WORD);
-	},
-	INSTR{	//	LD SP, HL : 8 cycles
-		WORD_LD(cpu.regs.sp, cpu.regs.hl);
-	},
-	INSTR{	//	LDHL SP, n : 12 cycles
-		WORD_LD(cpu.regs.hl, cpu.regs.sp+LOAD_IMMEDIATE_BYTE);
-	},
-	INSTR{	//	LD (nn), SP : 20 cycles
-		cpu.write_memory_16bit(LOAD_IMMEDIATE_WORD, cpu.regs.sp);
-	},
-	INSTR{	//	PUSH nn : 16 cycles
-		WORD_ALU(cpu.regs.sp, -2);
-		cpu.write_memory_16bit(cpu.regs.sp, PARAM_DEST_TO_WORD);
-	},
-	INSTR{	//	POP nn : 12 cycles
-		//	Not very happy with this solution? The POP instruction seems to be like two byte memloads with the stack pointer incrementing after each one?
-		((uword&)PARAM_DEST_TO_WORD) = 0;
-		for(int i{1}; i; --i){
-			((uword&)PARAM_DEST_TO_WORD) &= LOAD_MEMORY(cpu.regs.sp) & (0xFF << (8*i));
-			cpu.increment_16bit_register(cpu.regs.sp);
-		}
-	},
-	/*
-		8-BIT ALU
-	*/
-	INSTR{	//	ADD A, n : 4 - 8 cycles
-		RESET_FLAGS_ALL;
-		SET_CONDITIONAL_HALF_CARRY_FLAG(cpu.regs.a, PARAM_SRC_TO_BYTE);
-		SET_CONFITIONAL_CARRY_FLAG(cpu.regs.a, PARAM_SRC_TO_BYTE);
-		cpu.regs.a += PARAM_SRC_TO_BYTE;
-		SET_CONDITIONAL_ZERO_FLAG(cpu.regs.a);
-		//	Add flag stuff! half carry and carry flag!
-	},
-	INSTR{	//	ADC A, n : 4 - 8 cycles
-		RESET_FLAGS_ALL;
-		ubyte val = PARAM_SRC_TO_BYTE + ((cpu.regs.f & FLAG_C) ? 1 : 0);
-		SET_CONDITIONAL_HALF_CARRY_FLAG(cpu.regs.a, val);
-		SET_CONFITIONAL_CARRY_FLAG(cpu.regs.a, val);
-	},
-	INSTR{	//	SUB A, n : 4 - 8 cycles	
-		RESET_FLAGS_ALL;
-		SET_FLAGS(FLAG_N);
-		SET_CONDITIONAL_NOT_HALF_CARRY_FLAG(cpu.regs.a, PARAM_SRC_TO_BYTE);
-		SET_CONDITIONAL_NOT_CARRY_FLAG(cpu.regs.a, PARAM_SRC_TO_BYTE);
-		cpu.regs.a -= PARAM_SRC_TO_BYTE;
-		SET_CONDITIONAL_ZERO_FLAG(cpu.regs.a);
-	},
-	INSTR{	//	SBC A, n : 4 - 8 cycles
-		RESET_FLAGS_ALL;
-		SET_FLAGS(FLAG_N);
-		SET_CONDITIONAL_NOT_HALF_CARRY_FLAG(cpu.regs.a, PARAM_SRC_TO_BYTE);
-		SET_CONDITIONAL_NOT_CARRY_FLAG(cpu.regs.a, PARAM_SRC_TO_BYTE);
-		cpu.regs.a -= PARAM_SRC_TO_BYTE;
-		SET_CONDITIONAL_ZERO_FLAG(cpu.regs.a);
-	},
-	INSTR{	//	AND A, n : 4 - 8 cycles
-		RESET_FLAGS_ALL;
-		SET_FLAGS(FLAG_H);
-		cpu.regs.a &= PARAM_SRC_TO_BYTE;
-		SET_CONDITIONAL_ZERO_FLAG(cpu.regs.a);
-	},
-	INSTR{	//	OR A, n : 4 - 8 cycles
-		RESET_FLAGS_ALL;
-		cpu.regs.a |= PARAM_SRC_TO_BYTE;
-		SET_CONDITIONAL_ZERO_FLAG(cpu.regs.a);
-	},
-	INSTR{	//	XOR A, n : 4 - 8 cycles
-		RESET_FLAGS_ALL;
-		cpu.regs.a ^= PARAM_SRC_TO_BYTE;
-		SET_CONDITIONAL_ZERO_FLAG(cpu.regs.a);
-	},
-	INSTR{	//	CP A, n : 4 - 8 cycles
-		RESET_FLAGS_ALL;
-		ubyte tmp_cp_val = cpu.regs.a - PARAM_SRC_TO_BYTE;
-		SET_FLAGS(FLAG_Z);
-		SET_CONDITIONAL_ZERO_FLAG(tmp_cp_val);
-		if(0b0001-1111-cpu.regs.a < PARAM_SRC_TO_BYTE)
-			SET_FLAGS(FLAG_H);
-		if(cpu.regs.a < PARAM_SRC_TO_BYTE)
-			SET_FLAGS(FLAG_C);
-	},
-	INSTR{	//	INC A, n : 4 - 12
+	}},
+	{"LD (BC), u16", 3, 12, INSTR{
+
+	}},
+	{"LD (BC), A", 1, 8, INSTR{
+
+	}},
+	{"INC BC", 1, 8, INSTR{
+
+	}},
+	{"INC B", 1, 4, INSTR{
+
+	}},
+	{"DEC B", 1, 4, INSTR{ 
+
+	}},
+	{"LD B, u8", 2, 8, INSTR{
+
+	}},
+	{"RLCA", 1, 4, INSTR{
+
+	}},
+	{"LD (u16), SP", 3, 20, INSTR{
+
+	}},
+	{"ADD HL, BC", 1, 8, INSTR{
+
+	}},
+	{"LD A, (BC)", 1, 8, INSTR{
+
+	}},
+	{"DEC BC", 1, 8, INSTR{
+
+	}},
+	{"INC C", 1, 4, INSTR{
+
+	}},
+	{"DEC C", 1, 4, INSTR{
+
+	}},
+	{"LD C, u8", 1, 4, INSTR{
+
+	}},
+	{"RRCA", 1, 4, INSTR{
+
+	}},
+	{"STOP", 2, 4, INSTR{
+
+	}},
+	{"LD DE, u16", 3, 12, INSTR{
+
+	}},
+	{"LD (DE), A", 1, 8, INSTR{
+
+	}},
+	{"INC DE", 1, 8, INSTR{
+
+	}},
+	{"INC D", 1, 4, INSTR{
+
+	}},
+	{"DEC D", 1, 4, INSTR{
+
+	}},
+	{"LD D, u8", 2, 8, INSTR{
+
+	}},
+	{"RLA", 1, 4, INSTR{
+
+	}},
+	{"JR i8", 2, 12, INSTR{
+
+	}},
+	{"ADD HL, DE", 1, 8, INSTR{
+
+	}},
+	{"LD A, (DE)", 1, 8, INSTR{
+
+	}},
+	{"DEC DE", 1, 8, INSTR{
+
+	}},
+	{"INC E", 1, 4, INSTR{
+
+	}},
+	{"DEC E", 1, 4, INSTR{
+
+	}},
+	{"LD E, u8", 2, 8, INSTR{
+
+	}},
+	{"RRA", 1, 4, INSTR{
+
+	}},
+	{"JR NZ, i8", 2, 8, INSTR{
+
+	}},
+	{"LD HL, u16", 3, 12, INSTR{
+
+	}},
+	{"LD (HL+), A", 1, 8, INSTR{
+
+	}},
+	{"INC HL", 1, 8, INSTR{
+
+	}},
+	{"INC H", 1, 4, INSTR{
+
+	}},
+	{"DEC H", 1, 4, INSTR{
+
+	}},
+	{"LD H, u8", 2, 8, INSTR{
+
+	}},
+	{"DAA", 1, 4, INSTR{
+
+	}},
+	{"JR Z, i8", 2, 8, INSTR{
+
+	}},
+	{"ADD HL, HL", 1, 8, INSTR{
+
+	}},
+	{"LD A, (HL+)", 1, 8, INSTR{
+
+	}},
+	{"DEC HL", 1, 8, INSTR{
+
+	}},
+	{"INC L", 1, 4, INSTR{
+
+	}},
+	{"DEC L", 1, 4, INSTR{
+
+	}},
+	{"LD L, u8", 2, 8, INSTR{
+
+	}},
+	{"CPL", 1, 4, INSTR{
+
+	}},
+	{"JR NC, i8", 2, 8, INSTR{
+
+	}},
+	{"LD SP, u16", 3, 12, INSTR{
+
+	}},
+	{"LD (HL-), A", 1, 8, INSTR{
+
+	}},
+	{"INC SP", 1, 8, INSTR{
+
+	}},
+	{"INC (HL)", 1, 12, INSTR{
+
+	}},
+	{"DEC (HL)", 1, 4, INSTR{
+
+	}},
+	{"LD (HL), u8", 2, 12, INSTR{
+
+	}},
+	{"SCF", 1, 4, INSTR{
+
+	}},
+	{"JR C, i8", 2, 8, INSTR{
+
+	}},
+	{"ADD HL, SP", 1, 8, INSTR{
+
+	}},
+	{"LD A, (HL-)", 1, 8, INSTR{
+
+	}},
+	{"DEC SP", 1, 8, INSTR{
+
+	}},
+	{"INC A", 1, 4, INSTR{
+
+	}},
+	{"DEC A", 1, 4, INSTR{
+
+	}},
+	{"LD A, u8", 2, 8, INSTR{
+
+	}},
+	{"CCF", 1, 4, INSTR{
+
+	}},
+	{"LD B, B", 1, 4, INSTR{
+
+	}},
+	{"LD B, C", 1, 4, INSTR{
+
+	}},
+	{"LD B, D", 1, 4, INSTR{
+
+	}},
+	{"LD B, E", 1, 4, INSTR{
+
+	}},
+	{"LD B, H", 1, 4, INSTR{
+
+	}},
+	{"LD B, L", 1, 4, INSTR{
+
+	}},
+	{"LD B, (HL)", 1, 8, INSTR{
+
+	}},
+	{"LD B, A", 1, 4, INSTR{
+
+	}},
+	{"LD C, B", 1, 4, INSTR{
+
+	}},
+	{"LD C, C", 1, 4, INSTR{
+
+	}},
+	{"LD C, D", 1, 4, INSTR{
+
+	}},
+	{"LD C, E", 1, 4, INSTR{
+
+	}},
+	{"LD C, H", 1, 4, INSTR{
+
+	}},
+	{"LD C, L", 1, 4, INSTR{
+
+	}},
+	{"LD C, (HL)", 1, 8, INSTR{
+
+	}},
+	{"LD C, A", 1, 4, INSTR{
+
+	}},
+	{"LD D, B", 1, 4, INSTR{
+
+	}},
+	{"LD D, C", 1, 4, INSTR{
+
+	}},
+	{"LD D, D", 1, 4, INSTR{
+
+	}},
+	{"LD D, E", 1, 4, INSTR{
+
+	}},
+	{"LD D, H", 1, 4, INSTR{
+
+	}},
+	{"LD D, L", 1, 4, INSTR{
+
+	}},
+	{"LD D, (HL)", 1, 8, INSTR{
+
+	}},
+	{"LD D, A", 1, 4, INSTR{
+
+	}},
+	{"LD E, B", 1, 4, INSTR{
+
+	}},
+	{"LD E, C", 1, 4, INSTR{
+
+	}},
+	{"LD E, D", 1, 4, INSTR{
+
+	}},
+	{"LD E, E", 1, 4, INSTR{
+
+	}},
+	{"LD E, H", 1, 4, INSTR{
+
+	}},
+	{"LD E, L", 1, 4, INSTR{
+
+	}},
+	{"LD E, (HL)", 1, 8, INSTR{
+
+	}},
+	{"LD E, A", 1, 4, INSTR{
+
+	}},
+	{"LD H, B", 1, 4, INSTR{
+
+	}},
+	{"LD H, C", 1, 4, INSTR{
+
+	}},
+	{"LD H, D", 1, 4, INSTR{
+
+	}},
+	{"LD H, E", 1, 4, INSTR{
+
+	}},
+	{"LD H, H", 1, 4, INSTR{
+
+	}},
+	{"LD H, L", 1, 4, INSTR{
+
+	}},
+	{"LD H, (HL)", 1, 8, INSTR{
+
+	}},
+	{"LD H, A", 1, 4, INSTR{
+
+	}},
+	{"LD L, B", 1, 4, INSTR{
+
+	}},
+	{"LD L, C", 1, 4, INSTR{
+
+	}},
+	{"LD L, D", 1, 4, INSTR{
+
+	}},
+	{"LD L, E", 1, 4, INSTR{
+
+	}},
+	{"LD L, H", 1, 4, INSTR{
+
+	}},
+	{"LD L, L", 1, 4, INSTR{
+
+	}},
+	{"LD L, (HL)", 1, 8, INSTR{
+
+	}},
+	{"LD L, A", 1, 4, INSTR{
+
+	}},
+	{"LD (HL), B", 1, 8, INSTR{
+
+	}},
+	{"LD (HL), C", 1, 8, INSTR{
+
+	}},
+	{"LD (HL), D", 1, 8, INSTR{
+
+	}},
+	{"LD (HL), E", 1, 8, INSTR{
+
+	}},
+	{"LD (HL), H", 1, 8, INSTR{
+
+	}},
+	{"LD (HL), L", 1, 8, INSTR{
+
+	}},
+	{"HALT", 1, 4, INSTR{
+
+	}},
+	{"LD (HL), A", 1, 8, INSTR{
+
+	}},
+	{"LD A, B", 1, 4, INSTR{
+
+	}},
+	{"LD A, C", 1, 4, INSTR{
+
+	}},
+	{"LD A, D", 1, 4, INSTR{
+
+	}},
+	{"LD A, E", 1, 4, INSTR{
+
+	}},
+	{"LD A, H", 1, 4, INSTR{
+
+	}},
+	{"LD A, L", 1, 4, INSTR{
+
+	}},
+	{"LD A, (HL)", 1, 8, INSTR{
+
+	}},
+	{"LD A, A", 1, 4, INSTR{
+
+	}},
+	{"ADD A, B", 1, 4, INSTR{
+
+	}},
+	{"ADD A, C", 1, 4, INSTR{
+
+	}},
+	{"ADD A, D", 1, 4, INSTR{
+
+	}},
+	{"ADD A, E", 1, 4, INSTR{
+
+	}},
+	{"ADD A, H", 1, 4, INSTR{
+
+	}},
+	{"ADD A, L", 1, 4, INSTR{
+
+	}},
+	{"ADD A, (HL)", 1, 8, INSTR{
+
+	}},
+	{"ADD A, A", 1, 4, INSTR{
+
+	}},
+	{"ADC A, B", 1, 4, INSTR{
+
+	}},
+	{"ADC A, C", 1, 4, INSTR{
+
+	}},
+	{"ADC A, D", 1, 4, INSTR{
+
+	}},
+	{"ADC A, E", 1, 4, INSTR{
+
+	}},
+	{"ADC A, H", 1, 4, INSTR{
+
+	}},
+	{"ADC A, L", 1, 4, INSTR{
+
+	}},
+	{"ADC A, (HL)", 1, 8, INSTR{
+
+	}},
+	{"ADC A, A", 1, 4, INSTR{
+
+	}},
+	{"SUB A, B", 1, 4, INSTR{
+
+	}},
+	{"SUB A, C", 1, 4, INSTR{
+
+	}},
+	{"SUB A, D", 1, 4, INSTR{
+
+	}},
+	{"SUB A, E", 1, 4, INSTR{
+
+	}},
+	{"SUB A, H", 1, 4, INSTR{
+
+	}},
+	{"SUB A, L", 1, 4, INSTR{
+
+	}},
+	{"SUB A, (HL)", 1, 8, INSTR{
+
+	}},
+	{"SUB A, A", 1, 4, INSTR{
+
+	}},
+	{"SBC A, B", 1, 4, INSTR{
+
+	}},
+	{"SBC A, C", 1, 4, INSTR{
+
+	}},
+	{"SBC A, D", 1, 4, INSTR{
+
+	}},
+	{"SBC A, E", 1, 4, INSTR{
+
+	}},
+	{"SBC A, H", 1, 4, INSTR{
+
+	}},
+	{"SBC A, L", 1, 4, INSTR{
+
+	}},
+	{"SBC A, (HL)", 1, 8, INSTR{
+
+	}},
+	{"SBC A, A", 1, 4, INSTR{
+
+	}},
+	{"AND A, B", 1, 4, INSTR{
+
+	}},
+	{"AND A, C", 1, 4, INSTR{
+
+	}},
+	{"AND A, D", 1, 4, INSTR{
+
+	}},
+	{"AND A, E", 1, 4, INSTR{
+
+	}},
+	{"AND A, H", 1, 4, INSTR{
+
+	}},
+	{"AND A, L", 1, 4, INSTR{
+
+	}},
+	{"AND A, (HL)", 1, 8, INSTR{
+
+	}},
+	{"AND A, A", 1, 4, INSTR{
+
+	}},
+	{"XOR A, B", 1, 4, INSTR{
+
+	}},
+	{"XOR A, C", 1, 4, INSTR{
+
+	}},
+	{"XOR A, D", 1, 4, INSTR{
+
+	}},
+	{"XOR A, E", 1, 4, INSTR{
+
+	}},
+	{"XOR A, H", 1, 4, INSTR{
+
+	}},
+	{"XOR A, L", 1, 4, INSTR{
+
+	}},
+	{"XOR A, (HL)", 1, 8, INSTR{
+
+	}},
+	{"XOR A, A", 1, 4, INSTR{
+
+	}},
+	{"OR A, B", 1, 4, INSTR{
+
+	}},
+	{"OR A, C", 1, 4, INSTR{
+
+	}},
+	{"OR A, D", 1, 4, INSTR{
+
+	}},
+	{"OR A, E", 1, 4, INSTR{
+
+	}},
+	{"OR A, H", 1, 4, INSTR{
+
+	}},
+	{"OR A, L", 1, 4, INSTR{
+
+	}},
+	{"OR A, (HL)", 1, 8, INSTR{
+
+	}},
+	{"OR A, A", 1, 4, INSTR{
+
+	}},
+	{"CP A, B", 1, 4, INSTR{
+
+	}},
+	{"CP A, C", 1, 4, INSTR{
+
+	}},
+	{"CP A, D", 1, 4, INSTR{
+
+	}},
+	{"CP A, E", 1, 4, INSTR{
+
+	}},
+	{"CP A, H", 1, 4, INSTR{
+
+	}},
+	{"CP A, L", 1, 4, INSTR{
+
+	}},
+	{"CP A, (HL)", 1, 8, INSTR{
+
+	}},
+	{"CP A, A", 1, 4, INSTR{
+
+	}},
+	{"RET NZ", 1, 8, INSTR{
+
+	}},
+	{"POP BC", 1, 12, INSTR{
+
+	}},
+	{"JP NZ, u16", 3, 12, INSTR{
+
+	}},
+	{"JP u16", 3, 16, INSTR{
+
+	}},
+	{"CALL NZ, u16", 3, 12, INSTR{
+
+	}},
+	{"PUSH BC", 1, 16, INSTR{
+
+	}},
+	{"ADD A, u8", 2, 8, INSTR{
+
+	}},
+	{"RST 00h", 1, 16, INSTR{
+
+	}},
+	{"RET Z", 1, 8, INSTR{
+
+	}},
+	{"RET", 1, 16, INSTR{
+
+	}},
+	{"JP Z, u16", 3, 12, INSTR{
+
+	}},
+	{"PREFIX CB", 1, 4, INSTR{
+
+	}},
+	{"CALL Z, u16", 3, 12, INSTR{
+
+	}},
+	{"CALL u16", 3, 24, INSTR{
+
+	}},
+	{"ADC A, u8", 2, 8, INSTR{
 		
-	}
+	}},
+	{"RST 08h", 1, 16, INSTR{
+
+	}},
+	{"RET NC", 1, 8, INSTR{
+
+	}},
+	{"POP DE", 1, 12, INSTR{
+
+	}},
+	{"JP NC, u16", 3, 12, INSTR{
+
+	}},
+	{"N/A", 0, 0, INSTR{
+
+	}},
+	{"CALL NC, u16", 3, 12, INSTR{
+
+	}},
+	{"PUSH DE", 1, 16, INSTR{
+
+	}},
+	{"SUB A, u8", 2, 8, INSTR{
+
+	}},
+	{"RST 10h", 1, 16, INSTR{
+
+	}},
+	{"RET C", 1, 8, INSTR{
+
+	}},
+	{"RETI", 1, 16, INSTR{
+
+	}},
+	{"JP C, u16", 3, 12, INSTR{
+
+	}},
+	{"N/A", 0, 0, INSTR{
+
+	}},
+	{"CALL C, u16", 3, 12, INSTR{
+
+	}},
+	{"N/A", 0, 0, INSTR{
+
+	}},
+	{"SBC A, u8", 2, 8, INSTR{
+
+	}},
+	{"RST 18h", 1, 4, INSTR{
+
+	}},
+	{"LD (0xFF00+u8), A", 2, 12, INSTR{
+
+	}},
+	{"POP HL", 1, 4, INSTR{
+
+	}},
+	{"LD (0xFF00+C), A", 1, 8, INSTR{
+
+	}},
+	{"N/A", 0, 0, INSTR{
+
+	}},
+	{"N/A", 0, 0, INSTR{
+
+	}},
+	{"PUSH HL", 1, 16, INSTR{
+
+	}},
+	{"AND A, u8", 2, 8, INSTR{
+
+	}},
+	{"RST 20h", 1, 16, INSTR{
+
+	}},
+	{"ADD SP, i8", 2, 16, INSTR{
+
+	}},
+	{"JP HL", 1, 4, INSTR{
+
+	}},
+	{"LD (u16), A", 3, 16, INSTR{
+
+	}},
+	{"N/A", 0, 0, INSTR{
+
+	}},
+	{"N/A", 0, 0, INSTR{
+
+	}},
+	{"N/A", 0, 0, INSTR{
+
+	}},
+	{"XOR A, u8", 2, 8, INSTR{
+
+	}},
+	{"RST 28h", 1, 16, INSTR{
+
+	}},
+	{"LD A, (0xFF00+u8)", 2, 12, INSTR{
+
+	}},
+	{"POP AF", 1, 12, INSTR{
+
+	}},
+	{"LD A, (0xFF00+C)", 1, 8, INSTR{
+
+	}},
+	{"DI", 1, 4, INSTR{
+
+	}},
+	{"N/A", 0, 0, INSTR{
+
+	}},
+	{"PUSH AF", 1, 16, INSTR{
+
+	}},
+	{"OR A, u8", 2, 8, INSTR{
+
+	}},
+	{"RST 30h", 1, 16, INSTR{
+
+	}},
+	{"LD HL, SP+i8", 2, 12, INSTR{
+
+	}},
+	{"LD SP, HL", 1, 8, INSTR{
+
+	}},
+	{"LD A, (u16)", 3, 16, INSTR{
+
+	}},
+	{"EI", 1, 4, INSTR{
+
+	}},
+	{"N/A", 0, 0, INSTR{
+
+	}},
+	{"N/A", 0, 0, INSTR{
+
+	}},
+	{"CP A, u8", 2, 8, INSTR{
+
+	}},
+	{"RST 38h", 1, 16, INSTR{
+
+	}}
 };
-const int gbe::cpu::instruction_c{sizeof(gbe::cpu::instructions)/sizeof(gbe::cpu::instruction_t)};
+int gbe::cpu_t::instruction_count{sizeof(instructions)/sizeof(*instructions)};
