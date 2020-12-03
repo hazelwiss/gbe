@@ -9,38 +9,39 @@ constexpr int operator"" _mb(unsigned long long int bytes){
 }
 
 namespace gbe{
-	constexpr struct{
-		word int0x0000{0x0000};	//	Reservred interrupts -
-		word int0x0008{0x0008};
-		word int0x0010{0x0010};
-		word int0x0018{0x0018};
-		word int0x0020{0x0020};
-		word int0x0028{0x0028};
-		word int0x0030{0x0030};
-		word int0x0038{0x0038};
-		word int0x0040{0x0040};
-		word int0x0048{0x0048};	//	LCDC status interrupt.
-		word int0x0050{0x0050};	//	Timer overflow interrupt.
-		word int0x0058{0x0058};	//	Serial transfer competion interrupt.
-		word int0x0060{0x0060};	//	High-to-low of P10-P13 interrupt.
-								//	End of reserved interrupts.
-		word cartridge_type{0x0147};
-		word rom_size{0x0148};
-		word ram_size{0x0149};
-
-	} reserved_memory_locations;
 	struct bank_t{
-		byte mem[16_kb]{};	//	tmp!
+		template<typename t>
+		inline void write_to(const word adr, t value){
+			*(reinterpret_cast<t*>(&mem[adr])) = value;
+		}
+		template<typename t>
+		inline t read_from(const word adr){
+			return *((t*)&mem[adr]);
+		}
+	protected:
+		byte mem[16_kb]{};
 	};
 	struct mem_t{
-		void swap_bank(bank_t* bank, byte pos);
+		void load_ROM(const char*);
+
+		void write_byte_to_memory(word adr, byte value);
+		byte read_byte_from_memory(word adr);
+		void write_word_to_memory(word adr, word value);
+		word read_word_from_memory(word adr);
 
 	protected:
+		template<typename t>
+		void write_to_memory(const word& adr, t value){
+			*((t*)&mem[adr]) = value;
+		}
+		template<typename t>
+		t read_from_memory(word adr){
+			if(adr >= 0xE000 && adr <= 0xFDFF);
+				adr -= 2000;
+			return (t)mem[adr];
+		}
 		byte mem[0x10000];
-		struct{
-			bank_t* lower_bank;
-			bank_t* higher_bank;
-		} active_banks;
+		bank_t* active_bank;
 		bank_t* banks{nullptr};
 	};
 }
