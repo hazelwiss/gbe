@@ -4,7 +4,7 @@
 int main(){
 	
 	gbe::mem_t mem;
-	mem.load_ROM();
+	mem.load_ROM("roms/Legend of Zelda, The - Link's Awakening (U) (V1.2) [!]");
 
 	return 0;
 	
