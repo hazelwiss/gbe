@@ -2,7 +2,7 @@
 #define INSTR [](gbe::cpu_t& cpu) noexcept
 
 void gbe::cpu_t::emulate_fetch_decode_execute_cycle(){
-	throw gbe_exception(gbe_error_codes::UNKNOWN);
+	throw gbe_error_codes::UNKNOWN;
 }
 
 gbe::cpu_t::instruction_t gbe::cpu_t::instructions[]{

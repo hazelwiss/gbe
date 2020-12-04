@@ -30,11 +30,16 @@ word gbe::mem_t::read_word_from_memory(word adr){
 }
 
 void gbe::mem_t::load_ROM(const char* rom){
-	std::fstream stream(rom, std::ios::binary | std::ios::ate);
+	std::ifstream stream(rom, std::ios::binary | std::ios::ate);
 	if(!stream)
-		throw gbe::gbe_exception(gbe::gbe_error_codes::FSTREAM_INVALID);
-	char buffer[16_kb];
-	char* iter_buffer = buffer;
-	while(stream.get(*(iter_buffer++)));
-	memcpy(buffer, iter_buffer, sizeof(buffer));
+		throw gbe::gbe_error_codes::FSTREAM_INVALID;
+	int size = stream.tellg(); 
+	stream.seekg(std::fstream::beg);
+	size = size > 16_kb ? size : 16_kb;
+	char* buffer = new char[size];
+	char* tmp = buffer;
+	while(stream.get(*(tmp++)));
+	memcpy(buffer, buffer, size);	//	Copies to ROM Bank 0.
+	//	Implement copy to ROM Bank 1 and also read ROM Bank info from the ROM file. Lotsa ROMs here. 
+	delete[] buffer;
 }
