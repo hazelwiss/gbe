@@ -8,9 +8,8 @@ int main(){
 		mem.load_ROM("roms/Link's Awakening.gb");
 	}
 	catch(gbe::gbe_error e){
-		printf("error!\n");
+		printf("Error reading from file! %d\n", e);
 	}
-	return 0;
 	
 	gbe::cpu_t cpu;
 	while(true)
@@ -18,7 +17,7 @@ int main(){
 			cpu.emulate_fetch_decode_execute_cycle();
 		}
 		catch(gbe::gbe_error e){
-			printf("Error!\n");
+			printf("Error during the fetch, decode and execute cycle! %d\n", e);
 			break;
 		}
 		

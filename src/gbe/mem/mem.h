@@ -1,26 +1,7 @@
 #pragma once
-#include<standard_lib/typedefs.h>
-
-constexpr int operator"" _kb(unsigned long long int bytes){
-	return bytes*1024;
-}
-constexpr int operator"" _mb(unsigned long long int bytes){
-	return bytes*1024_kb;
-}
+#include"banks.h"
 
 namespace gbe{
-	struct bank_t{
-		template<typename t>
-		inline void write_to(const word adr, t value){
-			*(reinterpret_cast<t*>(&mem[adr])) = value;
-		}
-		template<typename t>
-		inline t read_from(const word adr){
-			return *((t*)&mem[adr]);
-		}
-	protected:
-		byte mem[16_kb]{};
-	};
 	struct mem_t{
 		void load_ROM(const char*);
 
@@ -29,19 +10,31 @@ namespace gbe{
 		void write_word_to_memory(word adr, word value);
 		word read_word_from_memory(word adr);
 
-	protected:
+	protected: 
 		template<typename t>
-		void write_to_memory(const word& adr, t value){
-			*((t*)&mem[adr]) = value;
+		void write_to_internal_memory(const word& adr, t value){
+			//*((t*)&mem[adr]) = value;
 		}
 		template<typename t>
-		t read_from_memory(word adr){
-			if(adr >= 0xE000 && adr <= 0xFDFF);
-				adr -= 2000;
-			return (t)mem[adr];
+		t read_from_internal_memory(word adr){
+			//if(adr >= 0xE000 && adr <= 0xFDFF);	//	echo ram?!
+				//adr -= 2000;
+			//return (t)mem[adr];
 		}
-		byte mem[0x10000];
-		bank_t* active_bank;
-		bank_t* banks{nullptr};
+		using mmu = memory_bank_controller_t*;
+		struct mem_controller_t{
+			virtual inline ~mem_controller_t(){
+				if(mem_controller)
+					delete mem_controller;
+			}
+			inline memory_bank_controller_t& get_mmu(){
+				return *this->mem_controller;
+			}
+			void set_bank_type(const int& type, const int& rom_size, const int& ram_size);
+		private:
+			int type{0};
+			mmu mem_controller{0};
+			bool is_initalized{false};
+		} mem_controller;
 	};
 }

@@ -20,13 +20,20 @@ namespace gbe{
 			mem_t memory;
 		} mem_hander;
 		struct{
-			inline void update_cycles_m(unsigned long long int m_cycles){
+			inline void increment_cycles_m(unsigned long long int m_cycles){
 				t_cycles+=m_cycles*4;
 				m_cycles+=m_cycles;
 			}
 			unsigned long long t_cycles{0};
 			unsigned long long m_cycles{0};
 		} cycles;
+		struct{
+			inline void increment_timer_and_divider(){
+				//	DO NOT FORGET TO IMPLEMENT
+			}
+			byte timer{0};
+			byte divider{0};
+		} timer_and_divider;
 
 		//	Instructions definiton.
 		struct instruction_t{
