@@ -7,9 +7,19 @@ namespace gbe{
 		void emulate_fetch_decode_execute_cycle();
 	protected:
 		struct{
-			byte a{0}, f{0};
+			byte a{0};
+			union{
+				struct{
+					byte z: 1;
+					byte n: 1;
+					byte h: 1;
+					byte c: 1;
+				} bits;
+				byte all_bits;
+			} f{0};
 			byte b{0}, c{0}, d{0}, e{0}, h{0}, l{0};
 			word& bc{(word&)b}, &de{(word&)d}, &hl{(word&)h}, &af{(word&)a}; 
+			word sp{0}, pc{0};
 		} regs;
 		struct{
 			inline const byte& read_byte(){}
@@ -44,5 +54,6 @@ namespace gbe{
 		};
 		static instruction_t instructions[];
 		static int instruction_count;
+		friend struct instructions;
 	};
 }

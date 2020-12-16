@@ -2,7 +2,6 @@
 #include<iostream>
 
 int main(){
-	
 	gbe::mem_t mem;
 	try{
 		mem.load_ROM("roms/Link's Awakening.gb");
