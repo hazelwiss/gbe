@@ -7,6 +7,7 @@ namespace gbe{
 		CARTRIDGE_TYPE = 0x0147,
 		ROM_SIZE = 0x0148,
 		RAM_SIZE = 0x0149,
+		DIVIDER_REG = 0xFF04,
 		INTERRUPT_REGISTER = 0xFFFF
 	};
 	struct mem_t{
@@ -26,6 +27,8 @@ namespace gbe{
 		void write_to_internal_memory(const word& adr, t value){
 			if(adr >= 0xE000 && adr <= 0xFDFF);	//	echo ram?! do it for other side too!!!!!!!!!!!!!
 				*((t*)&mem[adr-2000]) = value;
+			else if(adr >= 0xC000 && adr <= 0xDDFF)
+				*((t*)&mem[adr+2000]) = value;
 			*((t*)&mem[adr]) = value;
 		}
 		template<typename t>
@@ -64,5 +67,6 @@ namespace gbe{
 		} mem_controller;
 		byte mem[internal_memory_size];		//	Because we're not emulating GBC, we don't have to make WRAM exist in a bank but rather as internal memory.
 		byte& interrupt_reg{mem[static_cast<int>(reserved_memory_locations_enum::INTERRUPT_REGISTER)]};
+		byte& divider_reg{}
 	};
 }

@@ -600,7 +600,8 @@ gbe::cpu_t::instruction_t gbe::cpu_t::cpu_instructions[]{
 		INSTRUCTION.b8_cp(R_A);
 	}},
 	{"RET NZ", 1, 8, INSTR{
-		return INSTRUCTION.ret_cc(!R_F.bits.z) == gbe::branching_t::DO_BRANCH;
+		if(INSTRUCTION.ret_cc(!R_F.bits.z) == gbe::branching_t::DO_BRANCH)
+			cpu.timer_and_divider.;
 	}},
 	{"POP BC", 1, 12, INSTR{
 		INSTRUCTION.b16_pop(R_BC);

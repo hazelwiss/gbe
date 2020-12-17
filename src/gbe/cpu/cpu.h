@@ -30,13 +30,6 @@ namespace gbe{
 			unsigned long long t_cycles{0};
 			unsigned long long m_cycles{0};
 		} cycles;
-		struct{
-			inline void increment_timer_and_divider(){
-				//	DO NOT FORGET TO IMPLEMENT
-			}
-			byte timer{0};
-			byte divider{0};
-		} timer_and_divider;
 		mem_t memory;
 		//	Instructions definiton.
 		struct instruction_t{
