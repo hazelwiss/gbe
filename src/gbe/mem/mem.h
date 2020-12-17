@@ -7,7 +7,10 @@ namespace gbe{
 		CARTRIDGE_TYPE = 0x0147,
 		ROM_SIZE = 0x0148,
 		RAM_SIZE = 0x0149,
-		DIVIDER_REG = 0xFF04,
+		DIVIDER_REGISTER = 0xFF04,
+		TIMER_COUNTER = 0xFF05,
+		TIMER_MODULE = 0xFF06,
+		TIMER_CONTROL = 0xFF07,
 		INTERRUPT_REGISTER = 0xFFFF
 	};
 	struct mem_t{
@@ -67,6 +70,9 @@ namespace gbe{
 		} mem_controller;
 		byte mem[internal_memory_size];		//	Because we're not emulating GBC, we don't have to make WRAM exist in a bank but rather as internal memory.
 		byte& interrupt_reg{mem[static_cast<int>(reserved_memory_locations_enum::INTERRUPT_REGISTER)]};
-		byte& divider_reg{}
+		byte& timer_counter{mem[static_cast<int>(reserved_memory_locations_enum::DIVIDER_REGISTER)]};
+		byte& divider_reg{mem[static_cast<int>(reserved_memory_locations_enum::DIVIDER_REGISTER)]};
+		byte& timer_control{mem[static_cast<int>(reserved_memory_locations_enum::TIMER_CONTROL)]};
+		byte& timer_module{mem[static_cast<int>(reserved_memory_locations_enum::TIMER_MODULE)]};
 	};
 }
