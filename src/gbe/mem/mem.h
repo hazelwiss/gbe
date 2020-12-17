@@ -24,7 +24,7 @@ namespace gbe{
 	protected: 
 		template<typename t>
 		void write_to_internal_memory(const word& adr, t value){
-			if(adr >= 0xE000 && adr <= 0xFDFF);	//	echo ram?!
+			if(adr >= 0xE000 && adr <= 0xFDFF);	//	echo ram?! do it for other side too!!!!!!!!!!!!!
 				*((t*)&mem[adr-2000]) = value;
 			*((t*)&mem[adr]) = value;
 		}
@@ -38,8 +38,23 @@ namespace gbe{
 				if(mem_controller)
 					delete mem_controller;
 			}
-			inline memory_bank_controller_t& get_mmu(){
-				return *this->mem_controller;
+			inline void write_byte(const word& adr, byte val){
+				this->mem_controller->write_mem(adr, val);
+			}
+			inline void write_word(const word& adr, word val){
+				this->mem_controller->write_mem(adr, val);
+				this->mem_controller->write_mem(adr, val >> 8);
+			}
+			inline byte read_byte(const word& adr){
+				return this->mem_controller->read_mem(adr);
+			}
+			inline word read_word(const word& adr){
+				word rtrn;
+				rtrn = (this->mem_controller->read_mem(adr) << 8) & this->mem_controller->read_mem(adr+1);
+				return rtrn;
+			}
+			inline void copy_rom(byte* rom, int size){
+				this->mem_controller->copy_rom(rom, size);
 			}
 			void set_bank_type(const int& type, const int& rom_size, const int& ram_size);
 		private:
