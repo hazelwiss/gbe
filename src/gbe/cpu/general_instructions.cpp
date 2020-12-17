@@ -294,10 +294,10 @@ void gbe::general_instructions_t::b1_res(){
 void gbe::general_instructions_t::jp_nn(word immediate){
 	this->cpu.regs.pc = immediate;
 }
-void gbe::general_instructions_t::jp_cc_nn(word immediate, byte flag){
+gbe::branching_t gbe::general_instructions_t::jp_cc_nn(word immediate, byte flag){
 	if(flag)
 		this->cpu.regs.pc = immediate;
-	
+	return flag ? gbe::branching_t::DO_BRANCH : gbe::branching_t::DO_NOT_BRANCH;
 }
 void gbe::general_instructions_t::jp_hl(){
 	this->cpu.regs.pc = this->cpu.regs.hl;
@@ -305,9 +305,10 @@ void gbe::general_instructions_t::jp_hl(){
 void gbe::general_instructions_t::jr(signed char offset){
 	this->cpu.regs.pc += offset;
 }
-void gbe::general_instructions_t::jr_cc(signed char offset, byte flag){
+gbe::branching_t gbe::general_instructions_t::jr_cc(signed char offset, byte flag){
 	if(flag)
 		this->cpu.regs.pc += offset;
+	return flag ? gbe::branching_t::DO_BRANCH : gbe::branching_t::DO_NOT_BRANCH;
 }
 
 //	Calls
@@ -315,11 +316,12 @@ void gbe::general_instructions_t::call_nn(word immediate){
 	push_to_stack(this->cpu.regs.pc);
 	this->cpu.regs.pc = immediate;
 }
-void gbe::general_instructions_t::call_cc_nn(word immediate, byte flag){
+gbe::branching_t gbe::general_instructions_t::call_cc_nn(word immediate, byte flag){
 	if(flag){
 		push_to_stack(this->cpu.regs.pc);
 		this->cpu.regs.pc = immediate;
 	}
+	return flag ? gbe::branching_t::DO_BRANCH : gbe::branching_t::DO_NOT_BRANCH;
 }
 
 //	Restarts
@@ -332,9 +334,10 @@ void gbe::general_instructions_t::rst(byte offset){
 void gbe::general_instructions_t::ret(){
 	this->cpu.regs.pc = pop_from_stack();
 }
-void gbe::general_instructions_t::ret_cc(byte flag){
+gbe::branching_t gbe::general_instructions_t::ret_cc(byte flag){
 	if(flag)
 		this->cpu.regs.pc = pop_from_stack();
+	return flag ? gbe::branching_t::DO_BRANCH : gbe::branching_t::DO_NOT_BRANCH;
 }
 void gbe::general_instructions_t::reti(){
 	this->cpu.regs.pc = pop_from_stack();

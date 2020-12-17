@@ -5,6 +5,7 @@
 namespace gbe{
 	struct cpu_t;
 	struct mem_t;
+	enum class branching_t: bool{ DO_NOT_BRANCH = 0, DO_BRANCH };
 	struct INSTR_STRUCT_NAME{
 		INSTR_STRUCT_NAME(gbe::cpu_t& cpu);
 
@@ -70,21 +71,21 @@ namespace gbe{
 
 		//	Jumps
 		void jp_nn(word);
-		void jp_cc_nn(word, byte);
+		branching_t jp_cc_nn(word, byte);
 		void jp_hl();
 		void jr(signed char);
-		void jr_cc(signed char, byte);
+		gbe::branching_t jr_cc(signed char, byte);
 
 		//	Calls
 		void call_nn(word);
-		void call_cc_nn(word, byte);
+		branching_t call_cc_nn(word, byte);
 
 		//	Restarts
 		void rst(byte);
 
 		//	Returns
 		void ret();
-		void ret_cc(byte);
+		branching_t ret_cc(byte);
 		void reti();
 	protected:		
 		/*	
