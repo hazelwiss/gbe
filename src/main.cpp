@@ -1,16 +1,17 @@
 #include<gbe/cpu/cpu.h>
 #include<iostream>
 
-int main(){
-	gbe::mem_t mem;
+//	implement LCD thing for boot rom to work as intended!
+int main(){	
+	SDL_Init(SDL_INIT_EVERYTHING);
+	gbe::cpu_t cpu;
+	cpu.create_window();
 	try{
-		mem.load_ROM("roms/Link's Awakening.gb");
+		cpu.load_ROM("roms/testing/cpu_instrs.gb");
 	}
 	catch(gbe::gbe_error e){
 		printf("Error reading from file! %d\n", e);
 	}
-	
-	gbe::cpu_t cpu;
 	while(true)
 		try{
 			cpu.emulate_fetch_decode_execute_cycle();
@@ -18,7 +19,6 @@ int main(){
 		catch(gbe::gbe_error e){
 			printf("Error during the fetch, decode and execute cycle! %d\n", e);
 			break;
-		}
-		
+		}		
 	return 0;
 }

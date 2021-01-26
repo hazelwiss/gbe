@@ -1,9 +1,10 @@
 #include"banks.h"
+
 void gbe::memory_bank_controller_t::copy_rom(const byte* rom_data, int rom_size){
 	this->determine_bank_size();
 	this->setup_rom_and_ram_banks();
 	int i{0};
-	for(; i < 16_kb; ++i){
+	for(; i < 16_kb && i < rom_size; ++i){
 		this->rom_0.write_to(i, rom_data[i]);
 	}
 	for(int bank{0}, bank_i{0}; i < rom_size; ++i, bank_i = (bank_i+1) % sizeof(*switchable_rom_banks), bank = bank_i ? bank : bank+1){
@@ -21,48 +22,54 @@ void gbe::memory_bank_controller_t::determine_bank_size(){
 	}
 	else
 		switch(this->switchable_rom_banks_size_type){
-			case 0x52:
-				rom = 72;
-				break;
-			case 0x53:
-				rom = 80;
-				break;
-			case 0x54:
-				rom = 96;
-				break;
-			default:
-				throw gbe_error::CARTRIDGE_BANKS_AND_ROM_MISMATCH;
+		case 0x52:
+			rom = 72;
+			break;
+		case 0x53:
+			rom = 80;
+			break;
+		case 0x54:
+			rom = 96;
+			break;
+		default:
+			throw gbe_error::CARTRIDGE_BANKS_AND_ROM_MISMATCH;
 		}
 	switch(this->switchable_ram_banks_size_type){
-		case 0:
-			ram = 0;
-			break;
-		case 1:
-			ram = -1;	// don't know what to do with this yet?!
-			break;
-		case 2:
-			ram = 1;
-			break;
-		case 3:
-			ram = 4;
-			break;
-		case 4:
-			ram = 16;
-			break;
-		case 5:
-			ram = 8;
-			break;
+	case 0:
+		ram = 0;
+		break;
+	case 1:
+		ram = -1;	// don't know what to do with this yet?!
+		break;
+	case 2:
+		ram = 1;
+		break;
+	case 3:
+		ram = 4;
+		break;
+	case 4:
+		ram = 16;
+		break;
+	case 5:
+		ram = 8;
+		break;
+	default:
+		throw gbe_error::CARTRIDGE_BANKS_AND_ROM_MISMATCH;
 	}
 }
 void gbe::memory_bank_controller_t::setup_rom_and_ram_banks(){
 	if(this->switchable_rom_banks)
 		delete[] this->switchable_rom_banks;
 	if(this->switchable_ram_banks)
-		delete this->switchable_ram_banks;
-	this->switchable_rom_banks = new rom_bank_t[this->switchable_rom_banks_size];
-	this->switchable_ram_banks = new ram_bank_t[this->switchable_ram_banks_size];
-	this->swap_rom_bank(0);
-	this->swap_ram_bank(0);
+		delete[] this->switchable_ram_banks;
+	if(this->switchable_rom_banks_size > 0){
+		this->switchable_rom_banks = new rom_bank_t[this->switchable_rom_banks_size];
+		this->swap_rom_bank(0);
+	}
+	if(this->switchable_ram_banks_size > 0){
+		this->switchable_ram_banks = new ram_bank_t[this->switchable_ram_banks_size];
+		this->swap_ram_bank(0);
+	}
 }
 void gbe::memory_bank_controller_t::write_mem(const word& adr, byte val){
 	determine_ram_enable(adr, val);
@@ -78,38 +85,37 @@ void gbe::memory_bank_controller_t::write_mem(const word& adr, byte val){
 }
 byte gbe::memory_bank_controller_t::read_mem(const word& adr){
 	if(determine_if_rom_address(adr))
-		return select_rom_bank_from_address(adr).read_from<byte>(adr);
+		return select_rom_bank_from_address(adr).read_from(adr);
 	else if(determine_if_ram_address(adr))
-		return this->active_switchable_ram_bank->read_from<byte>(adr-0xA000);
+		return this->active_switchable_ram_bank->read_from(adr-0xA000);
 	else
 		throw gbe_error::READ_OR_WRITE_TO_INVALID_ADDRESS;
 }
-bool gbe::memory_bank_controller_t::determine_ram_enable(const word& adr, byte val){
-	if(adr >= 0x0000 && adr <= 0xBFFF)
-		if(val == 0x0A)
-			set_write_ram(true);
-		else
-			set_write_ram(false);
-	return this->ram_writing_enabled;
-}
-bool gbe::memory_bank_controller_t::determine_ram_rom_mode(const word& adr, byte val){
-	if(adr >= 0x6000 && adr <= 0x7FFF){
-		if(val == 0x01)
-			set_rom_ram_mode(RAM_BANKING_MODE);
-		else if(!val)
-			set_rom_ram_mode(ROM_BANKING_MODE);
-	}
-}
 
 //	MBC NONE
-bool gbe::memory_bank_controller_none_t::determine_ram_enable(const word& adr, byte val){
-	return true;
-}
 void gbe::memory_bank_controller_none_t::determine_bank_swap(const word& adr, byte val){
 	return;	//	this method should do nothing as it's essentially pointless when we don't have any banks.
 }
+void gbe::memory_bank_controller_none_t::determine_ram_enable(const word& adr, byte val){
+	return;
+}
+void gbe::memory_bank_controller_none_t::determine_ram_rom_mode(const word& adr, byte val){
+	return;
+}
+void gbe::memory_bank_controller_none_t::setup_rom_and_ram_banks(){
+	this->switchable_rom_banks = new rom_bank_t[1];
+	this->swap_rom_bank(0);
+	this->switchable_ram_banks = new ram_bank_t[1];
+	this->swap_ram_bank(0);
+}
 
 //	MBC 1
+void gbe::memory_bank_controller_mbc1_t::determine_ram_enable(const word& adr, byte val){
+	if(adr >= 0x0000 && adr <= 0x1FFF){
+		bool should_enable_ram = ((val & 0x0F) == 0x0A);	//	any value with the lower 4 bits being equal to 0x0A enables writing to ram.
+		this->set_write_ram(should_enable_ram);
+	}
+}
 void gbe::memory_bank_controller_mbc1_t::setup_rom_and_ram_banks(){	//	The mbc1 bank is a special case. Don't remove!
 	if(this->switchable_rom_banks)
 		delete[] this->switchable_rom_banks;
@@ -125,8 +131,11 @@ void gbe::memory_bank_controller_mbc1_t::setup_rom_and_ram_banks(){	//	The mbc1 
 }
 void gbe::memory_bank_controller_mbc1_t::determine_bank_swap(const word& adr, byte val){
 	if(adr >= 0x2000 && adr <= 0x3FFF){		//	ROM swap
-		int new_bank = val & 0b0001-1111;
-		if(new_bank == 0x20)
+		// implement bit masking!
+		int new_bank = adr & 0b0001-1111;
+		if(!new_bank)
+			new_bank = 1;		
+		else if(new_bank == 0x20)
 			new_bank = 0x21;
 		else if(new_bank == 0x40)
 			new_bank = 0x41;
@@ -138,29 +147,44 @@ void gbe::memory_bank_controller_mbc1_t::determine_bank_swap(const word& adr, by
 	}
 	else if(adr >= 0x4000 && adr <= 0x5FFF){	//	RAM swap
 		if(this->rom_ram_mode == ROM_BANKING_MODE){
-			int new_bank = (adr & 0b0110-0000) | this->active_switchable_rom_bank_offset;	//	IDK THIS IS THOUGH!	//	something to do with like ram/rom mode?!
+			int new_bank = (adr & 0b0111-1111) | this->active_switchable_rom_bank_offset;	//	this is potentially done wrong!
 			this->swap_rom_bank(new_bank);
-		} 
-		else if(this->rom_ram_mode == RAM_BANKING_MODE){
+		} else if(this->rom_ram_mode == RAM_BANKING_MODE){
 			int new_bank = (adr & 0b0110-0000) | this->active_switchable_ram_bank_offset;
 			this->swap_ram_bank(new_bank);
 		}
 	}	
 }
-
-//	MBC 2
-bool gbe::memory_bank_controller_mbc2_t::determine_ram_enable(const word& adr, byte val){
-	if(adr >= 0x0000 && adr <= 0x1FFF){
-		if(adr ^ 0b0001-0000)
-			this->set_write_ram(!this->ram_writing_enabled);	//	This could be wrong!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-	}
-	return this->ram_writing_enabled;
-}
-void gbe::memory_bank_controller_mbc2_t::determine_bank_swap(const word& adr, byte val){
+void gbe::memory_bank_controller_mbc1_t::determine_ram_rom_mode(const word& adr, byte val){
 	
 }
 
+//	MBC 2
+void gbe::memory_bank_controller_mbc2_t::determine_ram_enable(const word& adr, byte val){
+
+}
+void gbe::memory_bank_controller_mbc2_t::determine_ram_rom_mode(const word& adr, byte val){
+	
+}
+void gbe::memory_bank_controller_mbc2_t::determine_bank_swap(const word& adr, byte val){
+
+}
+void gbe::memory_bank_controller_mbc2_t::setup_rom_and_ram_banks(){
+	
+}
+
+
 //	MBC 3
+void gbe::memory_bank_controller_mbc3_t::determine_ram_enable(const word& adr, byte val){
+
+}
+void gbe::memory_bank_controller_mbc3_t::determine_ram_rom_mode(const word& adr, byte val){
+	
+}
 void gbe::memory_bank_controller_mbc3_t::determine_bank_swap(const word& adr, byte val){
 
 }
+void gbe::memory_bank_controller_mbc3_t::setup_rom_and_ram_banks(){
+	
+}
+

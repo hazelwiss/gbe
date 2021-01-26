@@ -6,16 +6,18 @@
 namespace gbe{
 	template<int size>
 	struct bank_t{
-		template<typename t>
-		inline void write_to(const word adr, t value){
-			*(reinterpret_cast<t*>(&mem[adr % size])) = value;
+		inline void write_to(const word adr, byte value){
+			if(adr >= size)
+				throw gbe_error_codes::OUT_OF_MEMORY_RANGE;
+			mem[adr] = value;
 		}
-		template<typename t>
-		inline t read_from(const word adr){
-			return *reinterpret_cast<t*>(&mem[adr]);
+		inline byte read_from(const word adr){
+			if(adr >= size)
+				throw gbe_error_codes::OUT_OF_MEMORY_RANGE;
+			return mem[adr];
 		}
 	protected:
-		//	Adding more members might fuck up some code where I use sizeof()
+		//	Adding more members might mess up some code where I use sizeof()
 		byte mem[size]{};
 	};
 	struct rom_bank_t: bank_t<16_kb>{};
@@ -26,9 +28,10 @@ namespace gbe{
 			switchable_rom_banks_size_type{switchable_rom_banks}, switchable_ram_banks_size_type{switchable_ram_banks} {}
 		void write_mem(const word& adr, byte val);
 		byte read_mem(const word& adr);
-		virtual bool determine_ram_enable(const word& adr, byte val);
-		virtual bool determine_ram_rom_mode(const word& adr, byte val);
+		virtual void determine_ram_enable(const word& adr, byte val) = NO_IMPLEMENTATION;
+		virtual void determine_ram_rom_mode(const word& adr, byte val) = NO_IMPLEMENTATION;
 		virtual void determine_bank_swap(const word& adr, byte val) = NO_IMPLEMENTATION;
+		virtual void setup_rom_and_ram_banks() = NO_IMPLEMENTATION;
 		void copy_rom(const byte* rom_data, int rom_size);
 	protected:
 		rom_bank_t rom_0;
@@ -44,7 +47,6 @@ namespace gbe{
 		int switchable_rom_banks_size{0};
 		const bool ram_writing_enabled{false};
 		const int rom_ram_mode{0};
-		virtual void setup_rom_and_ram_banks();
 		void determine_bank_size();
 		inline bool set_write_ram(const bool& value){
 			return *const_cast<bool*>(&ram_writing_enabled) = value;
@@ -66,7 +68,7 @@ namespace gbe{
 			return this->rom_0;
 		}
 		inline bool determine_if_rom_address(const word& adr){
-			return adr && adr < 32_kb;
+			return adr >= 0 && adr < 32_kb;
 		}
 		inline bool determine_if_ram_address(const word& adr){
 			return adr >= 0xA000 && adr <= 0xBFFF;
@@ -75,25 +77,33 @@ namespace gbe{
 	struct memory_bank_controller_none_t: memory_bank_controller_t{
 		inline memory_bank_controller_none_t(int switchable_rom_banks, int switchable_ram_banks): 
 			memory_bank_controller_t(switchable_rom_banks, switchable_ram_banks) {} 
-		bool determine_ram_enable(const word& adr, byte val) override;
+		void determine_ram_enable(const word& adr, byte val) override;
+		void determine_ram_rom_mode(const word& adr, byte val) override;
 		void determine_bank_swap(const word& adr, byte val) override;
+		void setup_rom_and_ram_banks() override;
 	};
 	struct memory_bank_controller_mbc1_t: memory_bank_controller_t{
 		inline memory_bank_controller_mbc1_t(int switchable_rom_banks, int switchable_ram_banks): 
 			memory_bank_controller_t(switchable_rom_banks, switchable_ram_banks) {}
-			void determine_bank_swap(const word& adr, byte val) override;
-	protected:
+		void determine_ram_enable(const word& adr, byte val) override;
+		void determine_ram_rom_mode(const word& adr, byte val) override;
+		void determine_bank_swap(const word& adr, byte val) override;
 		void setup_rom_and_ram_banks() override;
 	};	
 	struct memory_bank_controller_mbc2_t: memory_bank_controller_t{ 		//	Has no external ram, so we'll have to account for that!
 		inline memory_bank_controller_mbc2_t(int switchable_rom_banks, int switchable_ram_banks): 
 			memory_bank_controller_t(switchable_rom_banks, switchable_ram_banks) {}
-		bool determine_ram_enable(const word& adr, byte val) override;
+		void determine_ram_enable(const word& adr, byte val) override;
+		void determine_ram_rom_mode(const word& adr, byte val) override;
 		void determine_bank_swap(const word& adr, byte val) override;
+		void setup_rom_and_ram_banks() override;
 	};	
 	struct memory_bank_controller_mbc3_t: memory_bank_controller_t{
 		inline memory_bank_controller_mbc3_t(int switchable_rom_banks, int switchable_ram_banks): 
 			memory_bank_controller_t(switchable_rom_banks, switchable_ram_banks) {}
+		void determine_ram_enable(const word& adr, byte val) override;
+		void determine_ram_rom_mode(const word& adr, byte val) override;
 		void determine_bank_swap(const word& adr, byte val) override;
+		void setup_rom_and_ram_banks() override;
 	};
 }

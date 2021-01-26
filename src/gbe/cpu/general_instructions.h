@@ -12,12 +12,11 @@ namespace gbe{
 		// 8-Bit-Loads
 		void b8_load_reg_val(byte&, byte);
 		void b8_load_reg_adr(byte&, word);
-		void b8_load_adr_val(word, byte);
+		void b8_load_adr_reg(word, byte);
 
 		// 16-Bit-Loads
 		void b16_load_reg_val(word&, word);
 		void b16_load_reg_adr(word&, word);
-		void b16_load_adr_val(word, word);
 		//	give the offset and not the offset + sp or the sp register. 
 		void b16_load_sp_e(word&, byte);	//	16 bit load but with flags. Only really one type of instruction does this
 		void b16_push(word);
@@ -65,9 +64,9 @@ namespace gbe{
 		void misc_srl(byte&);
 
 		//	Bit opcodes
-		void b1_bit();
-		void b1_set();
-		void b1_res();
+		void b1_bit(byte&, byte);
+		void b1_set(byte&, byte);
+		void b1_res(byte&, byte);
 
 		//	Jumps
 		void jp_nn(word);

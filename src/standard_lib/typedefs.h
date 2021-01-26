@@ -1,5 +1,6 @@
 #pragma once
 #define NO_IMPLEMENTATION 0
+#define BIT(bit) (0b1 << bit)
 
 namespace gbe{
 	enum gbe_error_codes{
@@ -11,6 +12,8 @@ namespace gbe{
 		CARTRIDGE_BANKS_AND_RAM_MISMATCH,
 		SWAPED_TO_NONEXISTANT_BANK,
 		READ_OR_WRITE_TO_INVALID_ADDRESS,
+		UNDEFINED_OPCODE,
+		OUT_OF_MEMORY_RANGE
 	};
 	typedef gbe_error_codes gbe_error; 
 }
@@ -24,3 +27,5 @@ constexpr int operator"" _kb(unsigned long long int bytes){
 constexpr int operator"" _mb(unsigned long long int bytes){
 	return bytes*1024_kb;
 }
+
+constexpr int cpu_freq{4194304};

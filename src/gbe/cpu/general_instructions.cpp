@@ -21,16 +21,15 @@ inline void gbe::general_instructions_t::set_c_flag(int val){
 	this->cpu.regs.f.bits.c = (val != 0);
 }
 void gbe::general_instructions_t::push_to_stack(word val){
-	this->mem.write_word_to_memory(this->cpu.regs.sp, val);
+	this->mem.write_byte_to_memory(this->cpu.regs.sp-1, val >> 8);
+	this->mem.write_byte_to_memory(this->cpu.regs.sp-2, val & 0xFF);
 	this->cpu.regs.sp -= 2;
 }
-
 word gbe::general_instructions_t::pop_from_stack(){
-	word rtrn = this->mem.read_word_from_memory(this->cpu.regs.sp);
+	word rtrn  = this->mem.read_word_from_memory(this->cpu.regs.sp);
 	this->cpu.regs.sp += 2;
 	return rtrn;
 }
-
 
 // 8-Bit-Loads
 void gbe::general_instructions_t::b8_load_reg_val(byte& dst, byte src){
@@ -39,7 +38,7 @@ void gbe::general_instructions_t::b8_load_reg_val(byte& dst, byte src){
 void gbe::general_instructions_t::b8_load_reg_adr(byte& dst, word src){
 	dst = mem.read_byte_from_memory(src);
 }
-void gbe::general_instructions_t::b8_load_adr_val(word dst, byte src){
+void gbe::general_instructions_t::b8_load_adr_reg(word dst, byte src){
 	mem.write_byte_to_memory(dst, src);
 }
 
@@ -50,13 +49,10 @@ void gbe::general_instructions_t::b16_load_reg_val(word& dst, word src){
 void gbe::general_instructions_t::b16_load_reg_adr(word& dst, word src){
 	dst = mem.read_word_from_memory(src);
 }
-void gbe::general_instructions_t::b16_load_adr_val(word dst, word src){
-	mem.write_word_to_memory(dst, src);
-}
 void gbe::general_instructions_t::b16_load_sp_e(word& reg, byte offset){
 	reset_all_flags();
 	set_c_flag(this->cpu.regs.sp > 0xFFFF-offset);
-	set_h_flag((this->cpu.regs.sp & 0x0F) + (offset & 0x0F) > 0x0F);
+	set_h_flag((this->cpu.regs.sp & 0x00FF) + (offset & 0x0F) > 0x0F);
 	reg = this->mem.read_word_from_memory(this->cpu.regs.sp + offset);
 }	
 void gbe::general_instructions_t::b16_push(word nn){
@@ -70,9 +66,9 @@ void gbe::general_instructions_t::b16_pop(word& reg){
 void gbe::general_instructions_t::b8_add(byte val){
 	reset_all_flags();
 	set_h_flag((this->cpu.regs.a & 0x0F) + (val & 0x0F) > 0x0F);
-	set_c_flag(this->cpu.regs.a );
+	set_c_flag(this->cpu.regs.a);
 	this->cpu.regs.a += val;
-	set_z_flag(this->cpu.regs.a);
+	set_z_flag(!this->cpu.regs.a);
 }
 void gbe::general_instructions_t::b8_adc(byte val){
 	int sum = val+this->cpu.regs.f.bits.c;
@@ -80,7 +76,7 @@ void gbe::general_instructions_t::b8_adc(byte val){
 	set_h_flag((this->cpu.regs.a & 0x0F) + (val & 0x0F) > 0x0F);
 	set_c_flag(this->cpu.regs.a > (0xFF-val));
 	this->cpu.regs.a += sum;
-	set_z_flag(this->cpu.regs.a);
+	set_z_flag(!this->cpu.regs.a);
 }
 void gbe::general_instructions_t::b8_sub(byte val){
 	reset_all_flags();
@@ -88,7 +84,7 @@ void gbe::general_instructions_t::b8_sub(byte val){
 	set_h_flag((this->cpu.regs.a & 0x0F) + ((~val+1) & 0x0F) > 0x0F);
 	set_c_flag(this->cpu.regs.a > 0xFF - (~val+1));
 	this->cpu.regs.a -= val;
-	set_z_flag(this->cpu.regs.a);
+	set_z_flag(!this->cpu.regs.a);
 
 }
 void gbe::general_instructions_t::b8_sbc(byte val){
@@ -98,54 +94,54 @@ void gbe::general_instructions_t::b8_sbc(byte val){
 	set_h_flag((this->cpu.regs.a & 0x0F) + (sum & 0x0F) > 0x0F);
 	set_c_flag(this->cpu.regs.a > 0xFF - sum+1);
 	this->cpu.regs.a -= val;
-	set_z_flag(this->cpu.regs.a);
+	set_z_flag(!this->cpu.regs.a);
 }
 void gbe::general_instructions_t::b8_and(byte val){
 	reset_all_flags();
 	set_h_flag(true);
 	this->cpu.regs.a &= val;
-	set_z_flag(this->cpu.regs.a);
+	set_z_flag(!this->cpu.regs.a);
 }
 void gbe::general_instructions_t::b8_or(byte val){
 	reset_all_flags();
 	this->cpu.regs.a |= val;
-	set_z_flag(this->cpu.regs.a);
+	set_z_flag(!this->cpu.regs.a);
 }
 void gbe::general_instructions_t::b8_xor(byte val){
 	reset_all_flags();
 	this->cpu.regs.a ^= val;
-	set_z_flag(this->cpu.regs.a);
+	set_z_flag(!this->cpu.regs.a);
 }
 void gbe::general_instructions_t::b8_cp(byte val){
 	reset_all_flags();
 	set_n_flag(true);
-	set_h_flag((this->cpu.regs.a & 0x0F) + ((~val+1) & 0x0F) > 0x0F);
-	set_c_flag(this->cpu.regs.a > 0xFF - (~val+1));
-	set_z_flag(this->cpu.regs.a - val);
+	set_h_flag((this->cpu.regs.a & 0x0F) + ((~val+1) & 0x0F) <= 0x0F);
+	set_c_flag(this->cpu.regs.a < val);
+	set_z_flag(!(this->cpu.regs.a - val));
 }
 void gbe::general_instructions_t::b8_inc(byte& reg){
 	set_n_flag(false);
-	set_h_flag(reg+1 > 0x0F);
-	set_z_flag(++reg);
+	set_h_flag(reg == 0x0F);
+	set_z_flag(!++reg);
 }
 void gbe::general_instructions_t::b8_inc_adr(word adr){
 	byte val = mem.read_byte_from_memory(adr)+1;
 	set_n_flag(false);
 	set_h_flag(val > 0x0F);
 	mem.write_word_to_memory(adr, val);
-	set_z_flag(val);
+	set_z_flag(!val);
 }
 void gbe::general_instructions_t::b8_dec(byte& reg){
 	set_n_flag(true);
-	set_h_flag(reg + ~1 > 0x0F);
-	set_z_flag(--reg);
+	set_h_flag((reg & 0x0F) + ~1 > 0x0F);
+	set_z_flag(!--reg);
 }
 void gbe::general_instructions_t::b8_dec_adr(word adr){
 	byte val = mem.read_byte_from_memory(adr)-1;
 	set_n_flag(false);
 	set_h_flag(val > 0x0F);
 	mem.write_word_to_memory(adr, val);
-	set_z_flag(val);
+	set_z_flag(!val);
 }
 
 //	16-Bit-Arithmetic
@@ -174,7 +170,7 @@ void gbe::general_instructions_t::misc_swap(byte& reg){
 	byte upper = reg & 0xF0;
 	byte lower = reg & 0x0F;
 	reg = upper | lower;
-	set_z_flag(reg);
+	set_z_flag(!reg);
 }
 void gbe::general_instructions_t::misc_daa(){
 	if(!this->cpu.regs.f.bits.n){
@@ -219,10 +215,10 @@ void gbe::general_instructions_t::misc_stop(){
 	//	not sure on how to implement this one yet
 }
 void gbe::general_instructions_t::misc_di(){
-	this->mem.set_interrupt_flag(0);
+	this->mem.disable_interrupts();
 }
 void gbe::general_instructions_t::misc_ei(){
-	this->mem.set_interrupt_flag(1);
+	this->mem.enable_interrupts();
 }
 
 //	Rotates And Shifts
@@ -232,7 +228,10 @@ void gbe::general_instructions_t::misc_rlc(byte& reg){
 	set_c_flag(old_b);
 	reg <<= 1;
 	reg += old_b;
-	set_z_flag(reg);
+	if(&reg != &cpu.regs.a)
+		set_z_flag(!reg);
+	else 
+		set_z_flag(false);
 }
 void gbe::general_instructions_t::misc_rl(byte& reg){
 	byte old_c = this->cpu.regs.f.bits.c;
@@ -240,7 +239,10 @@ void gbe::general_instructions_t::misc_rl(byte& reg){
 	set_c_flag(reg >> 7);
 	reg <<= 1;
 	reg += old_c;
-	set_z_flag(reg);
+	if(&reg != &cpu.regs.a)
+		set_z_flag(!reg);
+	else
+		set_z_flag(false);
 }
 void gbe::general_instructions_t::misc_rrc(byte& reg){
 	byte old_c = this->cpu.regs.f.all_bits << 3;	//	keeps only the c flag left in the 7th bit!
@@ -248,7 +250,10 @@ void gbe::general_instructions_t::misc_rrc(byte& reg){
 	set_c_flag(reg & 0x01);
 	reg >>= 1;
 	reg += old_c;
-	set_z_flag(reg);
+	if(&reg != &cpu.regs.a)
+		set_z_flag(!reg);
+	else
+		set_z_flag(false);
 }
 void gbe::general_instructions_t::misc_rr(byte& reg){
 	byte old_b = reg << 7;
@@ -256,13 +261,16 @@ void gbe::general_instructions_t::misc_rr(byte& reg){
 	set_c_flag(old_b);
 	reg >>= 1;
 	reg += old_b;
-	set_z_flag(reg);
+	if(&reg != &cpu.regs.a)
+		set_z_flag(!reg);
+	else
+		set_z_flag(false);
 }
 void gbe::general_instructions_t::misc_sla(byte& reg){
 	reset_all_flags();
 	set_c_flag(reg & 0xb1000-0000);
 	reg <<= 1;
-	set_z_flag(reg);
+	set_z_flag(!reg);
 }
 void gbe::general_instructions_t::misc_sra(byte& reg){
 	reset_all_flags();
@@ -270,24 +278,26 @@ void gbe::general_instructions_t::misc_sra(byte& reg){
 	set_c_flag(reg & 0x01);
 	reg >>= 1;
 	reg += msb;
-	set_z_flag(reg);
+	set_z_flag(!reg);
 }
 void gbe::general_instructions_t::misc_srl(byte& reg){
 	reset_all_flags();
 	set_c_flag(reg & 0xb0000-0001);
 	reg >>= 1;
-	set_z_flag(reg);
+	set_z_flag(!reg);
 }
 
 //	Bit opcodes
-void gbe::general_instructions_t::b1_bit(){
-
+void gbe::general_instructions_t::b1_bit(byte& reg, byte bit){
+	set_n_flag(false);
+	set_h_flag(true);
+	set_z_flag(!((reg >> bit) & 0x01));
 }
-void gbe::general_instructions_t::b1_set(){
-
+void gbe::general_instructions_t::b1_set(byte& reg, byte bit){
+	reg |= (0x01 << bit);
 }
-void gbe::general_instructions_t::b1_res(){
-
+void gbe::general_instructions_t::b1_res(byte& reg, byte bit){
+	reg ^= ((0x01 << bit) & reg);
 }
 
 //	Jumps
@@ -313,12 +323,12 @@ gbe::branching_t gbe::general_instructions_t::jr_cc(signed char offset, byte fla
 
 //	Calls
 void gbe::general_instructions_t::call_nn(word immediate){
-	push_to_stack(this->cpu.regs.pc);
+	push_to_stack(this->cpu.regs.pc+3);
 	this->cpu.regs.pc = immediate;
 }
 gbe::branching_t gbe::general_instructions_t::call_cc_nn(word immediate, byte flag){
 	if(flag){
-		push_to_stack(this->cpu.regs.pc);
+		push_to_stack(this->cpu.regs.pc+3);
 		this->cpu.regs.pc = immediate;
 	}
 	return flag ? gbe::branching_t::DO_BRANCH : gbe::branching_t::DO_NOT_BRANCH;
@@ -326,7 +336,6 @@ gbe::branching_t gbe::general_instructions_t::call_cc_nn(word immediate, byte fl
 
 //	Restarts
 void gbe::general_instructions_t::rst(byte offset){
-	push_to_stack(this->cpu.regs.pc);
 	this->cpu.regs.pc = offset;
 }
 
@@ -341,5 +350,5 @@ gbe::branching_t gbe::general_instructions_t::ret_cc(byte flag){
 }
 void gbe::general_instructions_t::reti(){
 	this->cpu.regs.pc = pop_from_stack();
-	this->mem.set_interrupt_flag(1);
+	this->mem.enable_interrupts();
 }
