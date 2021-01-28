@@ -1,6 +1,6 @@
 #pragma once
 #include"banks.h"
-#define internal_memory_size (0xFFFF-0xC000)
+#define internal_memory_size (0xFFFF - 0x7FFF - (0xBFFF-0xA000))
 
 namespace gbe{
 	enum class reserved_memory_locations_enum : word{
@@ -14,6 +14,7 @@ namespace gbe{
 		DISABLE_BOOT_ROM = 0xFF50,
 		LCD_CONTROL_REGISTER = 0xFF40,
 		LCD_STATUS_REGISTER = 0xFF41,
+		DMA_TRANSFER = 0xFF46,
 		INTERRUPT_FLAG = 0xFF0F,
 		INTERRUPT_ENABLE = 0xFFFF
 	};
@@ -75,7 +76,7 @@ namespace gbe{
 		word read_word_from_internal_memory(word adr){
 			if(is_ppu_blocking(adr))
 				return 0xFFFF;
-			return (mem[adr+1] << 8) | mem[adr];
+			return mem[adr] | (mem[adr+1] << 8);
 		}
 		struct mem_controller_t{
 			virtual ~mem_controller_t(){
@@ -93,7 +94,7 @@ namespace gbe{
 				return this->bank_controller->read_mem(adr);
 			}
 			word read_word(const word& adr){
-				word rtrn = (this->bank_controller->read_mem(adr+1) << 8) | this->bank_controller->read_mem(adr);
+				word rtrn = this->bank_controller->read_mem(adr) | (this->bank_controller->read_mem(adr+1) << 8);
 				return rtrn;
 			}
 			void copy_rom(byte* rom, int size){
@@ -106,7 +107,10 @@ namespace gbe{
 		} mem_bank_controller;
 		struct{
 			byte& fetch_from_address(int index) const{
-				return (byte&)mem[index-0xC000];
+				if(index > 0xA000)
+					index -= (0xBFFF-0xA000);
+				index -= 0x7FFF;
+				return (byte&)mem[index];
 			}			
 			byte& operator[](int index) const{
 				return fetch_from_address(index);

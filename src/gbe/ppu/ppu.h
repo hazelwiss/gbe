@@ -7,7 +7,9 @@
 namespace gbe{
 	struct ppu_t{
 		ppu_t(mem_t& mem): memory{mem} {
-			memory.lcd_status_register = 0b10;
+			//memory.lcd_status_register = 0b10;
+			ly = 144;
+			memory.lcd_status_register = 0b11;
 		}
 		void create_window(){
 			display.create_window();

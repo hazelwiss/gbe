@@ -21,8 +21,7 @@ inline void gbe::general_instructions_t::set_c_flag(int val){
 	this->cpu.regs.f.bits.c = (val != 0);
 }
 void gbe::general_instructions_t::push_to_stack(word val){
-	this->mem.write_byte_to_memory(this->cpu.regs.sp-1, val >> 8);
-	this->mem.write_byte_to_memory(this->cpu.regs.sp-2, val & 0xFF);
+	this->mem.write_word_to_memory(this->cpu.regs.sp-2, val);
 	this->cpu.regs.sp -= 2;
 }
 word gbe::general_instructions_t::pop_from_stack(){
@@ -66,7 +65,7 @@ void gbe::general_instructions_t::b16_pop(word& reg){
 void gbe::general_instructions_t::b8_add(byte val){
 	reset_all_flags();
 	set_h_flag((this->cpu.regs.a & 0x0F) + (val & 0x0F) > 0x0F);
-	set_c_flag(this->cpu.regs.a);
+	set_c_flag(this->cpu.regs.a > 0xFF - val);
 	this->cpu.regs.a += val;
 	set_z_flag(!this->cpu.regs.a);
 }
@@ -81,8 +80,8 @@ void gbe::general_instructions_t::b8_adc(byte val){
 void gbe::general_instructions_t::b8_sub(byte val){
 	reset_all_flags();
 	set_n_flag(true);
-	set_h_flag((this->cpu.regs.a & 0x0F) + ((~val+1) & 0x0F) > 0x0F);
-	set_c_flag(this->cpu.regs.a > 0xFF - (~val+1));
+	set_h_flag(!((this->cpu.regs.a & 0x0F) + ((~val+1) & 0x0F) > 0x0F));
+	set_c_flag(!(this->cpu.regs.a > 0xFF - (~val+1)));
 	this->cpu.regs.a -= val;
 	set_z_flag(!this->cpu.regs.a);
 
@@ -265,6 +264,17 @@ void gbe::general_instructions_t::misc_rr(byte& reg){
 		set_z_flag(!reg);
 	else
 		set_z_flag(false);
+	/*
+	byte old_c = cpu.regs.f.bits.c << 3;
+	reset_all_flags();
+	set_c_flag(reg << 7);
+	reg >>= 1;
+	reg += old_c;
+	if(&reg != &cpu.regs.a)
+		set_z_flag(!reg);
+	else
+		set_z_flag(false);
+	*/
 }
 void gbe::general_instructions_t::misc_sla(byte& reg){
 	reset_all_flags();

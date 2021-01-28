@@ -1,5 +1,6 @@
 #pragma once
 #include<standard_lib/typedefs.h>
+#include<cstring>
 #define RAM_BANKING_MODE 0x01
 #define ROM_BANKING_MODE 0x00
 
@@ -7,14 +8,16 @@ namespace gbe{
 	template<int size>
 	struct bank_t{
 		inline void write_to(const word adr, byte value){
-			if(adr >= size)
+			word n_adr = adr%size;
+			if(n_adr >= size)
 				throw gbe_error_codes::OUT_OF_MEMORY_RANGE;
-			mem[adr] = value;
+			mem[n_adr] = value;
 		}
 		inline byte read_from(const word adr){
-			if(adr >= size)
+			word n_adr = adr%size;
+			if(n_adr >= size)
 				throw gbe_error_codes::OUT_OF_MEMORY_RANGE;
-			return mem[adr];
+			return mem[n_adr];
 		}
 	protected:
 		//	Adding more members might mess up some code where I use sizeof()
@@ -36,15 +39,14 @@ namespace gbe{
 	protected:
 		rom_bank_t rom_0;
 		rom_bank_t* const active_switchable_rom_bank{0};
-		const int active_switchable_rom_bank_offset{0};
 		ram_bank_t* const active_switchable_ram_bank{0};
-		const int active_switchable_ram_bank_offset{0};
 		rom_bank_t* switchable_rom_banks{0};
 		ram_bank_t* switchable_ram_banks{0};
 		int switchable_ram_banks_size_type{0};	//	Ambigious naming?
 		int switchable_ram_banks_size{0};
 		int switchable_rom_banks_size_type{0};
 		int switchable_rom_banks_size{0};
+		int secondary_bank_register{0};
 		const bool ram_writing_enabled{false};
 		const int rom_ram_mode{0};
 		void determine_bank_size();
@@ -55,11 +57,9 @@ namespace gbe{
 			return *const_cast<int*>(&rom_ram_mode) = value;
 		}
 		inline void swap_rom_bank(int bank){
-			(int&)this->active_switchable_rom_bank_offset = bank;
 			(rom_bank_t*&)this->active_switchable_rom_bank = &this->switchable_rom_banks[bank];
 		}
 		inline void swap_ram_bank(int bank){
-			(int&)this->active_switchable_ram_bank_offset = bank;
 			(ram_bank_t*&)this->active_switchable_ram_bank = &this->switchable_ram_banks[bank];
 		}
 		inline rom_bank_t& select_rom_bank_from_address(const word& adr){

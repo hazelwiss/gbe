@@ -9,7 +9,7 @@ void gbe::cpu_t::load_ROM(const char* file){
 		this->memory.mount_boot_rom();
 }
 
-int x = 0;
+int x = 1;
 
 void gbe::cpu_t::emulate_fetch_decode_execute_cycle(){
 	auto time = std::chrono::high_resolution_clock::now();
@@ -19,10 +19,10 @@ void gbe::cpu_t::emulate_fetch_decode_execute_cycle(){
 
 	if(this->memory.get_boot_rom_mount_status() && this->regs.pc >= 0x100)
 		this->memory.unmount_boot_rom();
-	
-	if(x > 143){
+
+	if(!this->memory.get_boot_rom_mount_status()){
 		printf("loc: %d\nopc: %s\na: %X\nf: %X\nb: %X\nc: %X\nd: %X\ne: %X\nh: %X\nl: %X\nsp: %X\npc: %X\n",
-			++x, instr.mnemonic, this->regs.a, this->regs.f.all_bits, this->regs.b, this->regs.c, this->regs.d, this->regs.e, this->regs.h, this->regs.l,
+			x++, instr.mnemonic, this->regs.a, this->regs.f.all_bits, this->regs.b, this->regs.c, this->regs.d, this->regs.e, this->regs.h, this->regs.l,
 				this->regs.sp, this->regs.pc);
 
 		printf("%X %X %X %X\n\n", 
@@ -32,18 +32,21 @@ void gbe::cpu_t::emulate_fetch_decode_execute_cycle(){
 			this->memory.read_byte_from_memory(this->regs.pc+3));
 	}
 
-	if(regs.pc == 0x2b6 && x == 145 && regs.sp == 0xDFFD)
-		int z = 0;
+	// exceptions at 6147
+	if(!this->memory.get_boot_rom_mount_status())
+		if(x % 1 == 0 && x >= 31483)	//	following RRA and CB instructions kinda fuck up
+			int z = 0;
+
 	if(instr.func(*this))
 		this->regs.pc += instr.byte_length;
 	this->cycles.increment_cycles_t(instr.t_cycles);
 	this->memory.increment_timer(this->cycles.t_cycles);
 
 	//	test stuff
-	int tmp = x;
-	x = cycles.t_cycles/cpu_freq;
-	if(tmp < x){
-		printf("%d\n", x);
+	//int tmp = x;
+	//x = cycles.t_cycles/cpu_freq;
+	if(false){
+		//printf("%d\n", x);
 		this->ppu.update(instr.t_cycles);
 		//std::this_thread::sleep_for(std::chrono::milliseconds(350));
 	}

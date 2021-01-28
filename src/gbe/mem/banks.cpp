@@ -79,7 +79,7 @@ void gbe::memory_bank_controller_t::write_mem(const word& adr, byte val){
 		return;
 	else if(determine_if_ram_address(adr))
 		if(this->ram_writing_enabled)
-			this->active_switchable_ram_bank->write_to(adr-0xA000, val);
+			this->active_switchable_ram_bank->write_to(adr, val);
 	else
 		throw gbe_error::READ_OR_WRITE_TO_INVALID_ADDRESS;
 }
@@ -87,7 +87,7 @@ byte gbe::memory_bank_controller_t::read_mem(const word& adr){
 	if(determine_if_rom_address(adr))
 		return select_rom_bank_from_address(adr).read_from(adr);
 	else if(determine_if_ram_address(adr))
-		return this->active_switchable_ram_bank->read_from(adr-0xA000);
+		return this->active_switchable_ram_bank->read_from(adr);
 	else
 		throw gbe_error::READ_OR_WRITE_TO_INVALID_ADDRESS;
 }
@@ -127,12 +127,14 @@ void gbe::memory_bank_controller_mbc1_t::setup_rom_and_ram_banks(){	//	The mbc1 
 		this->switchable_rom_banks_size = 125;
 
 	this->switchable_rom_banks = new rom_bank_t[this->switchable_rom_banks_size];
+	this->swap_rom_bank(0);
 	this->switchable_ram_banks = new ram_bank_t[this->switchable_ram_banks_size];
+	this->swap_ram_bank(0);
 }
 void gbe::memory_bank_controller_mbc1_t::determine_bank_swap(const word& adr, byte val){
 	if(adr >= 0x2000 && adr <= 0x3FFF){		//	ROM swap
 		// implement bit masking!
-		int new_bank = adr & 0b0001-1111;
+		int new_bank = adr & (0b0001-1111 | (secondary_bank_register << 5)) & this->switchable_rom_banks_size;
 		if(!new_bank)
 			new_bank = 1;		
 		else if(new_bank == 0x20)
@@ -143,15 +145,16 @@ void gbe::memory_bank_controller_mbc1_t::determine_bank_swap(const word& adr, by
 			new_bank = 0x61;
 		if(new_bank > this->switchable_rom_banks_size)
 			throw gbe_error::SWAPED_TO_NONEXISTANT_BANK;
-		this->swap_rom_bank(new_bank);
+		this->swap_rom_bank(new_bank-1);
 	}
 	else if(adr >= 0x4000 && adr <= 0x5FFF){	//	RAM swap
 		if(this->rom_ram_mode == ROM_BANKING_MODE){
-			int new_bank = (adr & 0b0111-1111) | this->active_switchable_rom_bank_offset;	//	this is potentially done wrong!
-			this->swap_rom_bank(new_bank);
+			secondary_bank_register = val & 0b11 & this->switchable_rom_banks_size;
 		} else if(this->rom_ram_mode == RAM_BANKING_MODE){
-			int new_bank = (adr & 0b0110-0000) | this->active_switchable_ram_bank_offset;
-			this->swap_ram_bank(new_bank);
+			int new_bank = val & 0b11 & this->switchable_ram_banks_size;
+			if(!new_bank)
+				new_bank = 1;
+			this->swap_ram_bank(new_bank-1);
 		}
 	}	
 }

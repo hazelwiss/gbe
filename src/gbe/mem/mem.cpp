@@ -25,7 +25,7 @@ byte gbe::mem_t::boot_rom[256]{
 };
 
 inline bool determine_if_bank_address(const word& adr){
-	return adr < 0x8000 || (adr >= 0xC000 && adr < 0xCFFF);
+	return adr < 0x8000 || (adr >= 0xA000 && adr <= 0xBFFF);
 }
 
 bool gbe::mem_t::is_ppu_blocking(const word& adr){
@@ -55,10 +55,13 @@ void gbe::mem_t::write_to_internal_memory(const word& adr, byte value){
 	else if(adr >= 0xFF00 && adr <= 0xFF7F){	//	I/O registers
 		if(adr == (word)reserved_memory_locations_enum::DIVIDER_REGISTER)
 			divider_reg = 0;	//	resets the divider reigster to zero whenever a value is written to it
-		if(adr == (word)reserved_memory_locations_enum::LCD_STATUS_REGISTER && //	only riggered during OAM scan, v/h-blank or LY=LYC
+		else if(adr == (word)reserved_memory_locations_enum::LCD_STATUS_REGISTER && //	only riggered during OAM scan, v/h-blank or LY=LYC
 			(lcd_status_register & 0b0000-0011) != 3){	
 			request_interrupt((word)interrupt_addresses::LCD_STAT);
 			mem[adr] |= (value &0b1111-1000);
+		}
+		else if(adr == (word)reserved_memory_locations_enum::DMA_TRANSFER){
+			int z = 0;
 		}
 		else
 			mem[adr] = value;
@@ -69,6 +72,8 @@ void gbe::mem_t::write_to_internal_memory(const word& adr, byte value){
 }
 
 void gbe::mem_t::write_byte_to_memory(word adr, byte value){
+	if(adr == 0xFF01)
+		printf("%c", value);
 	if(is_dma_transferring_blocking(adr))
 		return;
 	if(determine_if_bank_address(adr))
@@ -86,12 +91,16 @@ byte gbe::mem_t::read_byte_from_memory(word adr){
 	return read_byte_from_internal_memory(adr);
 }
 void gbe::mem_t::write_word_to_memory(word adr, word value){
+	if(adr == 0xFF01)
+		printf("%c", (byte)value);
 	if(is_dma_transferring_blocking(adr))
 		return;
 	if(determine_if_bank_address(adr))
 		mem_bank_controller.write_word(adr, value);
-	else 
+	else{
 		write_to_internal_memory(adr, value);
+		write_to_internal_memory(adr+1, value >> 8);
+	}
 }
 word gbe::mem_t::read_word_from_memory(word adr){
 	if(is_dma_transferring_blocking(adr))
