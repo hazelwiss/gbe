@@ -57,5 +57,6 @@ namespace gbe{
 		static int instruction_count;
 		friend struct INSTR_STRUCT_NAME;
 		INSTR_STRUCT_NAME instructions {*this};
+		void print_regs(gbe::cpu_t::instruction_t&);	// tmp
 	};
 }

@@ -2,6 +2,8 @@
 #include"banks.h"
 #define internal_memory_size (0xFFFF - 0x7FFF - (0xBFFF-0xA000))
 
+extern int x;
+
 namespace gbe{
 	enum class reserved_memory_locations_enum : word{
 		CARTRIDGE_TYPE = 0x0147,

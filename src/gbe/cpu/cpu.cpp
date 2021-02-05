@@ -9,32 +9,40 @@ void gbe::cpu_t::load_ROM(const char* file){
 		this->memory.mount_boot_rom();
 }
 
-int x = 1;
+void gbe::cpu_t::print_regs(gbe::cpu_t::instruction_t& instr){
+	printf("loc: %d\nopc: %s\na: %X\nf: %X\nb: %X\nc: %X\nd: %X\ne: %X\nh: %X\nl: %X\nsp: %X\npc: %X\n",
+		x, instr.mnemonic, this->regs.a, this->regs.f.all_bits, this->regs.b, this->regs.c, this->regs.d, this->regs.e, this->regs.h, this->regs.l,
+			this->regs.sp, this->regs.pc);
+
+	printf("%X %X %X %X\n\n", 
+		this->memory.read_byte_from_memory(this->regs.pc),
+		this->memory.read_byte_from_memory(this->regs.pc+1), 
+		this->memory.read_byte_from_memory(this->regs.pc+2),
+		this->memory.read_byte_from_memory(this->regs.pc+3));
+}
 
 void gbe::cpu_t::emulate_fetch_decode_execute_cycle(){
 	auto time = std::chrono::high_resolution_clock::now();
 	check_interrupt_status();
-	word instr_index = this->memory.read_byte_from_memory(this->regs.pc);
+	byte instr_index = this->memory.read_byte_from_memory(this->regs.pc);
 	auto instr = cpu_instructions[instr_index];
 
 	if(this->memory.get_boot_rom_mount_status() && this->regs.pc >= 0x100)
 		this->memory.unmount_boot_rom();
 
 	if(!this->memory.get_boot_rom_mount_status()){
-		printf("loc: %d\nopc: %s\na: %X\nf: %X\nb: %X\nc: %X\nd: %X\ne: %X\nh: %X\nl: %X\nsp: %X\npc: %X\n",
-			x++, instr.mnemonic, this->regs.a, this->regs.f.all_bits, this->regs.b, this->regs.c, this->regs.d, this->regs.e, this->regs.h, this->regs.l,
-				this->regs.sp, this->regs.pc);
-
-		printf("%X %X %X %X\n\n", 
-			this->memory.read_byte_from_memory(this->regs.pc),
-			this->memory.read_byte_from_memory(this->regs.pc+1), 
-			this->memory.read_byte_from_memory(this->regs.pc+2),
-			this->memory.read_byte_from_memory(this->regs.pc+3));
+		if(x >= 0 && x > 3499999){
+			//print_regs(instr);
+			++x;
+		}
+		else{ 
+			++x;
+		}
 	}
-
-	// exceptions at 6147
+	//	error at 254149 and 33579 in test rom 7
+	//	error at 2600000 in test rom 9
 	if(!this->memory.get_boot_rom_mount_status())
-		if(x % 1 == 0 && x >= 31483)	//	following RRA and CB instructions kinda fuck up
+		if(x % 1 == 0 && x >= 3595175)
 			int z = 0;
 
 	if(instr.func(*this))
@@ -111,8 +119,8 @@ gbe::cpu_t::instruction_t gbe::cpu_t::cpu_instructions[]{	//	returns if pc shoul
 		INSTRUCTION.misc_nop();
 		return true;
 	}},
-	{"LD (BC), u16", 3, 12, INSTR{
-		INSTRUCTION.b8_load_adr_reg(R_BC, LOAD_IMMEDIATE_WORD);
+	{"LD BC, u16", 3, 12, INSTR{
+		INSTRUCTION.b16_load_reg_val(R_BC, LOAD_IMMEDIATE_WORD);
 		return true;
 	}},
 	{"LD (BC), A", 1, 8, INSTR{
@@ -136,11 +144,11 @@ gbe::cpu_t::instruction_t gbe::cpu_t::cpu_instructions[]{	//	returns if pc shoul
 		return true;
 	}},
 	{"RLCA", 1, 4, INSTR{
-		INSTRUCTION.misc_rlc(R_A);
+		INSTRUCTION.misc_rlca();
 		return true;
 	}},
 	{"LD (u16), SP", 3, 20, INSTR{
-		INSTRUCTION.b8_load_adr_reg(LOAD_IMMEDIATE_WORD, R_SP);
+		INSTRUCTION.b16_load_adr_sp(LOAD_IMMEDIATE_WORD);
 		return true;
 	}},
 	{"ADD HL, BC", 1, 8, INSTR{
@@ -168,7 +176,7 @@ gbe::cpu_t::instruction_t gbe::cpu_t::cpu_instructions[]{	//	returns if pc shoul
 		return true;
 	}},
 	{"RRCA", 1, 4, INSTR{
-		INSTRUCTION.misc_rrc(R_A);
+		INSTRUCTION.misc_rrca();
 		return true;
 	}},
 	{"STOP", 2, 4, INSTR{
@@ -200,7 +208,7 @@ gbe::cpu_t::instruction_t gbe::cpu_t::cpu_instructions[]{	//	returns if pc shoul
 		return true;
 	}},
 	{"RLA", 1, 4, INSTR{
-		INSTRUCTION.misc_rl(R_A);
+		INSTRUCTION.misc_rla();
 		return true;
 	}},
 	{"JR i8", 2, 12, INSTR{
@@ -232,7 +240,7 @@ gbe::cpu_t::instruction_t gbe::cpu_t::cpu_instructions[]{	//	returns if pc shoul
 		return true;
 	}},
 	{"RRA", 1, 4, INSTR{
-		INSTRUCTION.misc_rr(R_A);
+		INSTRUCTION.misc_rra();
 		return true;
 	}},
 	{"JR NZ, i8", 2, 8, INSTR{
@@ -956,7 +964,6 @@ gbe::cpu_t::instruction_t gbe::cpu_t::cpu_instructions[]{	//	returns if pc shoul
 		case 0x00:
 		case 0x08:
 			reg_arg = &cpu.regs.b;
-
 			break;	
 		case 0x01:
 		case 0x09:
@@ -1188,6 +1195,7 @@ gbe::cpu_t::instruction_t gbe::cpu_t::cpu_instructions[]{	//	returns if pc shoul
 	}},
 	{"POP AF", 1, 12, INSTR{
 		INSTRUCTION.b16_pop(R_AF);
+		R_F.bits.unused = 0;
 		return true;
 	}},
 	{"LD A, (0xFF00+C)", 1, 8, INSTR{
@@ -1202,6 +1210,7 @@ gbe::cpu_t::instruction_t gbe::cpu_t::cpu_instructions[]{	//	returns if pc shoul
 		throw gbe::gbe_error_codes::UNDEFINED_OPCODE;
 	}},
 	{"PUSH AF", 1, 16, INSTR{
+		R_F.bits.unused = 0;
 		INSTRUCTION.b16_push(R_AF);
 		return true;
 	}},
@@ -1214,7 +1223,7 @@ gbe::cpu_t::instruction_t gbe::cpu_t::cpu_instructions[]{	//	returns if pc shoul
 		return false;
 	}},
 	{"LD HL, SP+i8", 2, 12, INSTR{
-		INSTRUCTION.b16_load_reg_val(R_HL, R_SP + (signed char)LOAD_IMMEDIATE_BYTE);
+		INSTRUCTION.b16_load_hl_sp_e(LOAD_IMMEDIATE_BYTE);
 		return true;
 	}},
 	{"LD SP, HL", 1, 8, INSTR{

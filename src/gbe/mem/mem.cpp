@@ -5,6 +5,8 @@
 #define RESERV_LOCATION_RAM_SIZE static_cast<int>(reserved_memory_locations_enum::RAM_SIZE)
 #define RESERV_LOCATION_CARTRIDGE_TYPE static_cast<int>(reserved_memory_locations_enum::CARTRIDGE_TYPE)
 
+int x = 1;
+
 byte gbe::mem_t::boot_rom[256]{
 	0x31, 0xfe, 0xff, 0xaf, 0x21, 0xff, 0x9f, 0x32, 0xcb, 0x7c, 0x20, 0xfb, 0x21, 0x26, 0xff, 0x0e,
 	0x11, 0x3e, 0x80, 0x32, 0xe2, 0x0c, 0x3e, 0xf3, 0xe2, 0x32, 0x3e, 0x77, 0x77, 0x3e, 0xfc, 0xe0,
@@ -45,11 +47,11 @@ void gbe::mem_t::write_to_internal_memory(const word& adr, byte value){
 	if(is_ppu_blocking(adr))
 		return;
 	if(adr >= 0xE000 && adr <= 0xFDFF){			//	echoes ram writen to this address to the address 2000 steps lower
-		mem[adr-2000] = value;
+		mem[adr-0x2000] = value;
 		mem[adr] = value;
 	}
 	else if(adr >= 0xC000 && adr <= 0xDDFF){	//	echoes ram writen to this address to the address 2000 steps above
-		mem[adr+2000] = value;
+		mem[adr+0x2000] = value;
 		mem[adr] = value;
 	}
 	else if(adr >= 0xFF00 && adr <= 0xFF7F){	//	I/O registers
@@ -84,7 +86,7 @@ void gbe::mem_t::write_byte_to_memory(word adr, byte value){
 byte gbe::mem_t::read_byte_from_memory(word adr){
 	if(is_dma_transferring_blocking(adr))
 		return 0xFF;
-	if(adr < sizeof(mem_t::boot_rom)-1 && is_boot_rom_mounted)
+	if(adr < sizeof(mem_t::boot_rom) && is_boot_rom_mounted)
 		return boot_rom[adr];
 	if(determine_if_bank_address(adr))
 		return mem_bank_controller.read_byte(adr);

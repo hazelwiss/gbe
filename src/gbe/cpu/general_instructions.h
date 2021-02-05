@@ -18,7 +18,8 @@ namespace gbe{
 		void b16_load_reg_val(word&, word);
 		void b16_load_reg_adr(word&, word);
 		//	give the offset and not the offset + sp or the sp register. 
-		void b16_load_sp_e(word&, byte);	//	16 bit load but with flags. Only really one type of instruction does this
+		void b16_load_adr_sp(word);
+		void b16_load_hl_sp_e(signed char);
 		void b16_push(word);
 		void b16_pop(word&);
 
@@ -56,9 +57,13 @@ namespace gbe{
 
 		//	Rotates And Shifts
 		void misc_rlc(byte&);
+		void misc_rlca();
 		void misc_rl(byte&);
+		void misc_rla();
 		void misc_rrc(byte&);
+		void misc_rrca();
 		void misc_rr(byte&);
+		void misc_rra();
 		void misc_sla(byte&);
 		void misc_sra(byte&);
 		void misc_srl(byte&);
