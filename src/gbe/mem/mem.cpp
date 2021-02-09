@@ -5,8 +5,6 @@
 #define RESERV_LOCATION_RAM_SIZE static_cast<int>(reserved_memory_locations_enum::RAM_SIZE)
 #define RESERV_LOCATION_CARTRIDGE_TYPE static_cast<int>(reserved_memory_locations_enum::CARTRIDGE_TYPE)
 
-int x = 1;
-
 byte gbe::mem_t::boot_rom[256]{
 	0x31, 0xfe, 0xff, 0xaf, 0x21, 0xff, 0x9f, 0x32, 0xcb, 0x7c, 0x20, 0xfb, 0x21, 0x26, 0xff, 0x0e,
 	0x11, 0x3e, 0x80, 0x32, 0xe2, 0x0c, 0x3e, 0xf3, 0xe2, 0x32, 0x3e, 0x77, 0x77, 0x3e, 0xfc, 0xe0,
@@ -58,17 +56,16 @@ void gbe::mem_t::write_to_internal_memory(const word& adr, byte value){
 		if(adr == (word)reserved_memory_locations_enum::DIVIDER_REGISTER)
 			divider_reg = 0;	//	resets the divider reigster to zero whenever a value is written to it
 		else if(adr == (word)reserved_memory_locations_enum::LCD_STATUS_REGISTER && //	only riggered during OAM scan, v/h-blank or LY=LYC
-			(lcd_status_register & 0b0000-0011) != 3){	
-			request_interrupt((word)interrupt_addresses::LCD_STAT);
-			mem[adr] |= (value &0b1111-1000);
+			(lcd_status_register & 0b0000'0011) != 3){	
+			request_interrupt((byte)interrupt_bits::LCD_STAT);
+			mem[adr] |= (value &0b1111'1000);
 		}
 		else if(adr == (word)reserved_memory_locations_enum::DMA_TRANSFER){
-			int z = 0;
+			//	do something here?
 		}
 		else
 			mem[adr] = value;
 	}
-	else if(adr == (word)reserved_memory_locations_enum::INTERRUPT_ENABLE);	//	disables writing to the interrupt master flag
 	else
 		mem[adr] = value;
 }
@@ -93,8 +90,10 @@ byte gbe::mem_t::read_byte_from_memory(word adr){
 	return read_byte_from_internal_memory(adr);
 }
 void gbe::mem_t::write_word_to_memory(word adr, word value){
-	if(adr == 0xFF01)
+	if(adr == 0xFF01){
+		printf("%c", (byte)(value >> 8));
 		printf("%c", (byte)value);
+	}
 	if(is_dma_transferring_blocking(adr))
 		return;
 	if(determine_if_bank_address(adr))
@@ -115,12 +114,11 @@ word gbe::mem_t::read_word_from_memory(word adr){
 }
 
 void gbe::mem_t::increment_timer(unsigned long long int& cycles){
-	//	every 256 cycles this timer should increment
 	byte divider_register_cmp_val = cycles % 256;
 	if(!divider_register_cmp_val || divider_register_cmp_val < this->increment_divider_tmp_value)
 		++this->divider_reg;
 	this->increment_divider_tmp_value = divider_register_cmp_val;
-	if(this->timer_control & 0b0000-1000){
+	if(this->timer_control & BIT(2)){
 		byte timer_counter_cmp_val;
 		switch(this->timer_control & 0xb0000-0011){
 		case 0b00:
@@ -139,7 +137,12 @@ void gbe::mem_t::increment_timer(unsigned long long int& cycles){
 		if(!timer_counter_cmp_val || timer_counter_cmp_val < this->increment_timer_tmp_value){
 			if(this->timer_counter == 0xFF){
 				this->timer_counter = this->timer_modulo;
-				this->request_interrupt((word)interrupt_addresses::TIMER);
+				timer_overflow = true;
+			}
+			else if(timer_overflow && this->timer_counter == this->timer_modulo){
+				timer_overflow = false;
+				this->request_interrupt((byte)interrupt_bits::TIMER);
+				++this->timer_counter;
 			}
 			else 
 				++this->timer_counter;

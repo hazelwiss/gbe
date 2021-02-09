@@ -168,9 +168,9 @@ void gbe::general_instructions_t::b16_dec(word& reg){
 //	Miscellaneous
 void gbe::general_instructions_t::misc_swap(byte& reg){
 	reset_all_flags();
-	byte upper = reg & 0xF0;
-	byte lower = reg & 0x0F;
-	reg = upper | lower;
+	byte upper = (reg&0xF0) >> 4;
+	byte lower = (reg&0x0F) << 4;
+	reg = lower | upper;
 	set_z_flag(!reg);
 }
 void gbe::general_instructions_t::misc_daa(){
@@ -212,17 +212,31 @@ void gbe::general_instructions_t::misc_scf(){
 void gbe::general_instructions_t::misc_nop(){
 	return;
 }
-void gbe::general_instructions_t::misc_halt(){
-	//	not sure on how to implement this one yet
+gbe::branching_t gbe::general_instructions_t::misc_halt(){
+	if(cpu.memory.get_interrupt_flag() & cpu.memory.get_interrupt_enable()){
+		if(!cpu.memory.get_ime() && !halted){
+			auto instr = cpu.cpu_instructions[cpu.memory.read_byte_from_memory(cpu.regs.pc+1)];
+			cpu.regs.pc += instr.byte_length;
+			cpu.cycles.increment_cycles_t(instr.t_cycles);
+		}
+		halted = false;
+		return branching_t::DO_BRANCH;
+	}
+	halted = true;
+	return branching_t::DO_NOT_BRANCH;
 }
-void gbe::general_instructions_t::misc_stop(){
+gbe::branching_t gbe::general_instructions_t::misc_stop(){
+	//printf("STOP! ISN'T IMPLEMENTED YET!\n");
+	return branching_t::DO_BRANCH;
 	//	not sure on how to implement this one yet
 }
 void gbe::general_instructions_t::misc_di(){
-	this->mem.disable_interrupts();
+	this->cpu.request_e_interrupt = false;
+	this->cpu.request_d_interrupt = true;
 }
 void gbe::general_instructions_t::misc_ei(){
-	this->mem.enable_interrupts();
+	this->cpu.request_e_interrupt = true;
+	this->cpu.request_d_interrupt = false;
 }
 
 //	Rotates And Shifts
@@ -265,11 +279,11 @@ void gbe::general_instructions_t::misc_rrc(byte& reg){
 	set_z_flag(!reg);
 }
 void gbe::general_instructions_t::misc_rrca(){
-	byte old_b = cpu.regs.a & BIT(7);
+	byte old_b = cpu.regs.a & BIT(0);
 	reset_all_flags();
 	set_c_flag(old_b);
 	cpu.regs.a >>= 1;
-	cpu.regs.a += old_b;
+	cpu.regs.a += old_b << 7;
 }
 void gbe::general_instructions_t::misc_rr(byte& reg){
 	byte old_c = this->cpu.regs.f.all_bits << 3;	//	keeps only the c flag left in the 7th bit!
@@ -371,5 +385,6 @@ gbe::branching_t gbe::general_instructions_t::ret_cc(byte flag){
 }
 void gbe::general_instructions_t::reti(){
 	this->cpu.regs.pc = pop_from_stack();
-	this->mem.enable_interrupts();
+	this->cpu.request_e_interrupt = true;
+	this->cpu.request_d_interrupt = false;
 }

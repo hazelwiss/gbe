@@ -2,8 +2,6 @@
 #include"banks.h"
 #define internal_memory_size (0xFFFF - 0x7FFF - (0xBFFF-0xA000))
 
-extern int x;
-
 namespace gbe{
 	enum class reserved_memory_locations_enum : word{
 		CARTRIDGE_TYPE = 0x0147,
@@ -20,12 +18,12 @@ namespace gbe{
 		INTERRUPT_FLAG = 0xFF0F,
 		INTERRUPT_ENABLE = 0xFFFF
 	};
-	enum class interrupt_addresses: byte{
-		V_BLANK = 0x40,
-		LCD_STAT = 0x48,
-		TIMER = 0x50,
-		SERIAL = 0x58,
-		Joypad = 0x60
+	enum class interrupt_bits: byte{
+		V_BLANK = 0b1,
+		LCD_STAT = 0b10,
+		TIMER = 0b100,
+		SERIAL = 0b1000,
+		Joypad = 0b1'0000
 	};
 	struct mem_t{
 		void load_ROM(const char*);
@@ -39,14 +37,20 @@ namespace gbe{
 		byte get_interrupt_flag(){
 			return this->interrupt_flag;
 		}
-		void enable_interrupts(){
-			this->interrupt_enable = 1;
-		}
-		void disable_interrupts(){
-			this->interrupt_enable = 0;
+		void set_interrupt_enable(byte val){
+			this->interrupt_enable = val;
 		}
 		byte get_interrupt_enable(){
 			return this->interrupt_enable;
+		}
+		void enable_ime(){
+			this->ime = 1;
+		}
+		void disable_ime(){
+			this->ime = 0;
+		}
+		byte get_ime(){
+			return this->ime;
 		}
 		void mount_boot_rom(){
 			is_boot_rom_mounted = true;
@@ -118,12 +122,14 @@ namespace gbe{
 				return fetch_from_address(index);
 			}
 		protected:
-			byte mem[internal_memory_size];		//	Because we're not emulating GBC, we don't have to make WRAM exist in a bank but rather as internal memory.
+			byte mem[internal_memory_size+1];	//	Because we're not emulating GBC, we don't have to make WRAM exist in a bank but rather as internal memory.
 		} mem;
 		bool is_boot_rom_mounted{false};
 		bool is_dma_transfer{false};
 		byte increment_divider_tmp_value{0};
 		byte increment_timer_tmp_value{0};
+		bool timer_overflow = false;
+		byte ime{0};
 		static byte boot_rom[];
 		byte& interrupt_enable{mem[static_cast<int>(reserved_memory_locations_enum::INTERRUPT_ENABLE)]};
 		byte& interrupt_flag{mem[static_cast<int>(reserved_memory_locations_enum::INTERRUPT_FLAG)]};

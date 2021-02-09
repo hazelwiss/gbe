@@ -50,8 +50,8 @@ namespace gbe{
 		void misc_ccf();
 		void misc_scf();
 		void misc_nop();
-		void misc_halt();
-		void misc_stop();
+		branching_t misc_halt();
+		branching_t misc_stop();
 		void misc_di();
 		void misc_ei();
 
@@ -97,6 +97,7 @@ namespace gbe{
 		*/
 		gbe::cpu_t& cpu;
 		gbe::mem_t& mem;
+		bool halted = false;
 		inline void reset_all_flags();
 		inline void set_z_flag(int val);
 		inline void set_n_flag(int val);

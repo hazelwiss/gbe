@@ -14,72 +14,65 @@ struct pixel{
 void gbe::ppu_t::update(byte cycles){
 	if(!(lcd_control & BIT(7)))
 		return;
-	
-	//	test render oam sprites!
-	pixel data[X_RES*Y_RES/4];
-	memset(data, 0, sizeof(data));
-	byte test[0xFE9F-0xFE00];
-	memcpy(test, &memory.mem[0xFE00], sizeof(test));
-
-	for(int i = 0xFE00; i < 0xFE9F; i+=4){
-		int x = memory.mem[i+1];
-		int y = memory.mem[i];
-		int tile_number = memory.mem[2];
-		if(x-2 < 0 || (y*160/4)-4 < 0)
-			continue;
-		pixel *cur_data = &data[x-2+(y*160/4)-4];
-		byte row1 = memory.mem[0x8000+tile_number*16];
-		byte row2 = memory.mem[0x8000+tile_number*16+1];
-		(byte&)*cur_data = 0;
-		for(int i = 0; i < 8; ++i, cur_data+=40){
-			cur_data->a = ((row1 << 1) | row2) & 0b11;
-			cur_data->b = ((row1 << 1) | row2) & 0b1100;
-			cur_data->c = ((row1 << 1) | row2) & 0b1100-00;
-			cur_data->d = ((row1 << 1) | row2) & 0b1100-0000;
-		}
-	}
 
 	++this->ly;
+	//if(this->ly == 140)
+		//memory.request_interrupt((byte)interrupt_bits::V_BLANK);
+	return;
 
-	display.update_buffer((byte*)data, sizeof(data));
+	//byte pixel[160*144];
+
+	byte test[] = {
+		0xCE, 0xED, 0x66, 0x66, 0xCC, 0x0D, 0x00, 0x0B, 0x03, 0x73, 0x00, 0x83, 0x00, 0x0C, 0x00, 0x0D,
+ 		0x00, 0x08, 0x11, 0x1F, 0x88, 0x89, 0x00, 0x0E, 0xDC, 0xCC, 0x6E, 0xE6, 0xDD, 0xDD, 0xD9, 0x99,
+		0xBB, 0xBB, 0x67, 0x63, 0x6E, 0x0E, 0xEC, 0xCC, 0xDD, 0xDC, 0x99, 0x9F, 0xBB, 0xB9, 0x33, 0x3E
+	};
+
+	byte tex_data[0x9FFF-0x8000];
+	byte* tt = tex_data;
+	memcpy(tex_data, &memory.mem[0x8000], sizeof(tex_data));
+
+	constexpr int adr_start = 0;//0x8000; 
+	constexpr int adr_end   = 32;//0x9FFF;
+	constexpr int adr_range = adr_end-adr_start;
+
+	byte test_tex[]{
+		0x00, 0x01, 0x10, 0x11, 0x00, 0x01, 0x10, 0x11,
+		0x00, 0x01, 0x10, 0x11, 0x00, 0x01, 0x10, 0x11,
+		0x00, 0x01, 0x10, 0x11, 0x00, 0x01, 0x10, 0x11,
+		0x00, 0x01, 0x10, 0x11, 0x00, 0x01, 0x10, 0x11,
+	};
+
+	for(int i = adr_start; i < adr_end; i+=2){
+		byte rowb_1 = test_tex[i];//memory.mem[i];
+		byte rowb_2 = test_tex[i+1];//memory.mem[i+1];
+		int x = ((i-adr_start)/16)*8;
+		int y = ((i-adr_start)/2%8) + (x/160)*8;
+		x%=160;
+		for(int b = 7; b >= 0; --b){
+			switch (((rowb_1 << 1) & (1 << (b+1))) | (rowb_2 & (1 << b)))
+			{
+			case 0b00:
+				display.fill_rect(x+7-b, y, 1, 1, 0xFF);
+				break;
+			case 0b01:
+				display.fill_rect(x+7-b, y, 1, 1, 0x80);
+				break;
+			case 0b10:
+				display.fill_rect(x+7-b, y, 1, 1, 0x40);
+				break;
+			case 0b11:
+				display.fill_rect(x+7-b, y, 1, 1, 0x00);
+				break;
+			}
+		}
+		if(y == 145)
+			display.render_buffer();
+	}
+
+	//display.update_buffer((byte*)data, sizeof(data));
 	display.render_buffer();
 	return;
-	/*
-	int window_display_enabled = lcd_control & BIT(5);
-	int window_and_background_display_mode = lcd_control & BIT(4);
-	int sprite_size = lcd_control & BIT(2);
-	int display_sprites = lcd_control & BIT(1);
-	int monochrome = lcd_control & BIT(0);
-	word window_tileset_start_position = 0x9C00;
-	word background_tileset_start_position = 0x9C00;
-	if(lcd_control & BIT(6)){	//	window tile map display select
-		window_tileset_start_position = 0x9800;
-	}
-	if(lcd_control & BIT(3)){
-		background_tileset_start_position = 0x9800;
-	}
-	if(ly >= 144)
-		memory.request_interrupt((word)interrupt_addresses::V_BLANK);
-	if(lcd_status & BIT(6))
-		if(ly == lcy)
-			memory.request_interrupt((word)interrupt_addresses::LCD_STAT);
-	//	add the other LCD_STAT interrupts things and test them when lcd mode is implemented.
-	
-	
-	display.update_buffer();
-	if(window_display_enabled)
-		display.render_buffer();
-	if(!(cycles % DOTS_PER_SCANLINE) || (cycles % DOTS_PER_SCANLINE) < (dots % DOTS_PER_SCANLINE)){
-		++scanline;
-		if(scanline > 143){
-			change_mode(1);
-		}
-		else{
-
-		}
-	}
-	dots = (dots + cycles) % MAX_DOTS;
-	*/
 }
 
 void gbe::ppu_t::mode_3(byte& cycles){

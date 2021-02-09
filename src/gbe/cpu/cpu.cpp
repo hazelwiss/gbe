@@ -9,60 +9,32 @@ void gbe::cpu_t::load_ROM(const char* file){
 		this->memory.mount_boot_rom();
 }
 
-void gbe::cpu_t::print_regs(gbe::cpu_t::instruction_t& instr){
-	printf("loc: %d\nopc: %s\na: %X\nf: %X\nb: %X\nc: %X\nd: %X\ne: %X\nh: %X\nl: %X\nsp: %X\npc: %X\n",
-		x, instr.mnemonic, this->regs.a, this->regs.f.all_bits, this->regs.b, this->regs.c, this->regs.d, this->regs.e, this->regs.h, this->regs.l,
-			this->regs.sp, this->regs.pc);
-
-	printf("%X %X %X %X\n\n", 
-		this->memory.read_byte_from_memory(this->regs.pc),
-		this->memory.read_byte_from_memory(this->regs.pc+1), 
-		this->memory.read_byte_from_memory(this->regs.pc+2),
-		this->memory.read_byte_from_memory(this->regs.pc+3));
-}
-
 void gbe::cpu_t::emulate_fetch_decode_execute_cycle(){
-	auto time = std::chrono::high_resolution_clock::now();
 	check_interrupt_status();
 	byte instr_index = this->memory.read_byte_from_memory(this->regs.pc);
 	auto instr = cpu_instructions[instr_index];
-
 	if(this->memory.get_boot_rom_mount_status() && this->regs.pc >= 0x100)
 		this->memory.unmount_boot_rom();
-
-	if(!this->memory.get_boot_rom_mount_status()){
-		if(x >= 0 && x > 3499999){
-			//print_regs(instr);
-			++x;
+	if(this->request_handle){
+		if(this->request_e_interrupt){
+			memory.enable_ime();
+			this->request_e_interrupt = false;
+		}else{
+			memory.disable_ime();
+			this->request_d_interrupt = false;
 		}
-		else{ 
-			++x;
-		}
+		this->request_handle = false;
 	}
-	//	error at 254149 and 33579 in test rom 7
-	//	error at 2600000 in test rom 9
-	if(!this->memory.get_boot_rom_mount_status())
-		if(x % 1 == 0 && x >= 3595175)
-			int z = 0;
-
+	if(this->request_d_interrupt | this->request_e_interrupt)
+		this->request_handle = true;
+	byte diff = this->cycles.t_cycles;
 	if(instr.func(*this))
 		this->regs.pc += instr.byte_length;
-	this->cycles.increment_cycles_t(instr.t_cycles);
+	diff = this->cycles.t_cycles - diff;
+	this->cycles.increment_cycles_t(instr.t_cycles+diff);
 	this->memory.increment_timer(this->cycles.t_cycles);
-
-	//	test stuff
-	//int tmp = x;
-	//x = cycles.t_cycles/cpu_freq;
-	if(false){
-		//printf("%d\n", x);
-		this->ppu.update(instr.t_cycles);
-		//std::this_thread::sleep_for(std::chrono::milliseconds(350));
-	}
-	
-	if(std::chrono::duration_cast<std::chrono::nanoseconds>(time - sync_time).count() > 93600){	// implement timers properly!
-		//std::this_thread::sleep_for(std::chrono::duration_cast<std::chrono::nanoseconds>(time-sync_time));
-		sync_time = time;
-	}
+	//if(this->cycles.t_cycles % 1000 == 0)
+	this->ppu.update(instr.t_cycles+diff);
 }
 
 void gbe::cpu_t::check_interrupt_status(){
@@ -72,28 +44,29 @@ void gbe::cpu_t::check_interrupt_status(){
 	//	in the flag.
 	int reg_flag = this->memory.get_interrupt_flag();
 	int reg_enable = this->memory.get_interrupt_enable();
-	if(reg_enable & reg_flag){
-		if(reg_flag & reg_enable & BIT(0)){				//	V-Blank; INT 40
-			this->instructions.call_nn(0x40);
-			reg_flag ^= BIT(0);
+	if(this->memory.get_ime() && (reg_flag & reg_enable & 0b0001'1111)){
+		instructions.b16_push(regs.pc);
+		if(reg_flag & reg_enable & BIT(0)){			//	V-Blank; INT 40
+			regs.pc = 0x40;
+			memory.set_interrupt_flag(reg_flag^BIT(0));
 		}
-		else if(reg_flag & reg_enable & BIT(1)){		//	LCD STAT; INT 48
-			this->instructions.call_nn(0x48);
-			reg_flag ^= BIT(1);
+		else if(reg_flag & reg_enable & BIT(1)){	//	LCD STAT; INT 48;
+			regs.pc = 0x48;
+			memory.set_interrupt_flag(reg_flag^BIT(1));
 		}
-		else if(reg_flag & reg_enable & BIT(2)){		//	Timer; INT 50
-			this->instructions.call_nn(0x50);
-			reg_flag ^= BIT(2);
+		else if(reg_flag & reg_enable & BIT(2)){	//	Timer; INT 50
+			regs.pc = 0x50;
+			memory.set_interrupt_flag(reg_flag^BIT(2));
 		}
-		else if(reg_flag & reg_enable & BIT(3)){		//	Serial; INT 58
-			this->instructions.call_nn(0x58);;
-			reg_flag ^= BIT(3);
+		else if(reg_flag & reg_enable & BIT(3)){	//	Serial; INT 58
+			regs.pc = 0x58;
+			memory.set_interrupt_flag(reg_flag^BIT(3));
 		}
-		else if(reg_flag & reg_enable & BIT(4)){		//	Joypad; INT 60
-			this->instructions.call_nn(0x60);
-			reg_flag ^= BIT(4);
+		else if(reg_flag & reg_enable & BIT(4)){	//	Joypad; INT 60
+			regs.pc = 0x60;
+			memory.set_interrupt_flag(reg_flag^BIT(4));
 		}
-		memory.disable_interrupts();
+		memory.disable_ime();
 	}
 }
 
@@ -180,7 +153,8 @@ gbe::cpu_t::instruction_t gbe::cpu_t::cpu_instructions[]{	//	returns if pc shoul
 		return true;
 	}},
 	{"STOP", 2, 4, INSTR{
-		INSTRUCTION.misc_stop();
+		if(INSTRUCTION.misc_stop() == branching_t::DO_BRANCH)
+			return true;
 		return false;	//	returns false and waits for button press
 	}},
 	{"LD DE, u16", 3, 12, INSTR{
@@ -596,7 +570,8 @@ gbe::cpu_t::instruction_t gbe::cpu_t::cpu_instructions[]{	//	returns if pc shoul
 		return true;
 	}},
 	{"HALT", 1, 4, INSTR{
-		INSTRUCTION.misc_halt();
+		if(INSTRUCTION.misc_halt() == branching_t::DO_BRANCH)
+			return true;
 		return false;	//	halts until any interrupt
 	}},
 	{"LD (HL), A", 1, 8, INSTR{
@@ -957,6 +932,7 @@ gbe::cpu_t::instruction_t gbe::cpu_t::cpu_instructions[]{	//	returns if pc shoul
 		}
 		byte* reg_arg;		//	stores which register to use in instruction.
 		byte bit_arg = 0; 	//	stores which bit to operate on.
+		byte mem_tmp;
 		int next_instr_high = (next_instr & 0xF0) >> 4;
 		int next_instr_low = next_instr & 0x0F;
 		bool memory_reading = false;
@@ -987,7 +963,8 @@ gbe::cpu_t::instruction_t gbe::cpu_t::cpu_instructions[]{	//	returns if pc shoul
 			break;
 		case 0x06:
 		case 0x0E:
-			reg_arg = new byte{cpu.memory.read_byte_from_memory(cpu.regs.hl)};
+			mem_tmp = byte{cpu.memory.read_byte_from_memory(cpu.regs.hl)};
+			reg_arg = &mem_tmp;
 			memory_reading = true;
 			break;
 		case 0x07:
@@ -1028,7 +1005,6 @@ gbe::cpu_t::instruction_t gbe::cpu_t::cpu_instructions[]{	//	returns if pc shoul
 		}
 		if(memory_reading){
 			cpu.memory.write_byte_to_memory(cpu.regs.hl, *reg_arg);
-			delete reg_arg;
 		}
 		return true;
 	}},

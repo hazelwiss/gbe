@@ -45,6 +45,7 @@ namespace gbe{
 		} cycles;
 		mem_t memory;
 		ppu_t ppu{memory};
+		bool request_e_interrupt{0}, request_d_interrupt{0}, request_handle{0};
 		std::chrono::_V2::system_clock::time_point sync_time;
 		//	Instructions definiton.
 		struct instruction_t{
@@ -57,6 +58,5 @@ namespace gbe{
 		static int instruction_count;
 		friend struct INSTR_STRUCT_NAME;
 		INSTR_STRUCT_NAME instructions {*this};
-		void print_regs(gbe::cpu_t::instruction_t&);	// tmp
 	};
 }
