@@ -8,7 +8,7 @@ namespace gbe{
 		void update_buffer(byte* buffer, int size);
 		void render_buffer();
 
-		void fill_rect(int x, int y, int w, int h, word colour);
+		void fill_rect(int x, int y, int w, int h, unsigned int colour);
 	protected:
 		SDL_Window* 	window_handle	{nullptr};
 		SDL_Renderer* 	renderer_handle	{nullptr};

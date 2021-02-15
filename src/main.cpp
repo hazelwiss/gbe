@@ -7,7 +7,7 @@ int main(){
 	gbe::cpu_t cpu;
 	cpu.create_window();
 	try{
-		cpu.load_ROM("roms/testing/03-op sp,hl.gb");
+		cpu.load_ROM("roms/Tetris.gb");
 	}
 	catch(gbe::gbe_error e){
 		printf("Error reading from file! %d\n", e);

@@ -9,14 +9,10 @@ namespace gbe{
 	struct bank_t{
 		inline void write_to(const word adr, byte value){
 			word n_adr = adr%size;
-			if(n_adr >= size)
-				throw gbe_error_codes::OUT_OF_MEMORY_RANGE;
 			mem[n_adr] = value;
 		}
 		inline byte read_from(const word adr){
 			word n_adr = adr%size;
-			if(n_adr >= size)
-				throw gbe_error_codes::OUT_OF_MEMORY_RANGE;
 			return mem[n_adr];
 		}
 	protected:
@@ -76,7 +72,7 @@ namespace gbe{
 	};
 	struct memory_bank_controller_none_t: memory_bank_controller_t{
 		inline memory_bank_controller_none_t(int switchable_rom_banks, int switchable_ram_banks): 
-			memory_bank_controller_t(switchable_rom_banks, switchable_ram_banks) {} 
+			memory_bank_controller_t(switchable_rom_banks, switchable_ram_banks) { set_write_ram(true); } 
 		void determine_ram_enable(const word& adr, byte val) override;
 		void determine_ram_rom_mode(const word& adr, byte val) override;
 		void determine_bank_swap(const word& adr, byte val) override;

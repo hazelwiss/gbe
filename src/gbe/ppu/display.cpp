@@ -1,7 +1,7 @@
 #include"display.h"
 
 void gbe::display_t::create_window(){
-	this->window_handle 	= SDL_CreateWindow("gba", 0, 0, 160, 144, SDL_WINDOW_SHOWN);
+	this->window_handle 	= SDL_CreateWindow("gbe", 0, 0, 160, 144, SDL_WINDOW_SHOWN);
 	this->surface_handler 	= SDL_GetWindowSurface(this->window_handle);
 	this->renderer_handle	= SDL_GetRenderer(this->window_handle);
 	SDL_SetRenderDrawColor(this->renderer_handle, 255, 255, 255, 255);
@@ -21,7 +21,7 @@ void gbe::display_t::update_buffer(byte* buffer, int size){
 	//pixel_buffer.format = 
 }
 
-void gbe::display_t::fill_rect(int x, int y, int w, int h, word colour){
+void gbe::display_t::fill_rect(int x, int y, int w, int h, unsigned int colour){
 	SDL_Rect rect;
 	int col;
 	rect.x = x;

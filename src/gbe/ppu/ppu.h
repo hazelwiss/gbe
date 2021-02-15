@@ -51,9 +51,11 @@ namespace gbe{
 		byte& lcd_control{memory.mem.fetch_from_address((word)reserved_memory_locations_enum::LCD_CONTROL_REGISTER)};
 		byte& lcd_status{memory.mem.fetch_from_address((word)reserved_memory_locations_enum::LCD_STATUS_REGISTER)};
 		byte& scy{memory.mem.fetch_from_address(0xFF42)};
+		byte& scx{memory.mem.fetch_from_address(0xFF43)};
 		byte& ly{memory.mem.fetch_from_address(0xFF44)};
 		byte& lcy{memory.mem.fetch_from_address(0xFF45)};
 		byte& wy{memory.mem.fetch_from_address(0xFF4A)};
+		byte& wx{memory.mem.fetch_from_address(0xFF4B)};
 	};
 }
 

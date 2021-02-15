@@ -29,6 +29,7 @@ inline bool determine_if_bank_address(const word& adr){
 }
 
 bool gbe::mem_t::is_ppu_blocking(const word& adr){
+	return false; //tmp
 	byte mode = lcd_status_register & 0x0000-0011;
 	if(adr >= 0xFE00 && adr <= 0xFE9F){
 		if(mode > 1)
@@ -63,11 +64,20 @@ void gbe::mem_t::write_to_internal_memory(const word& adr, byte value){
 		else if(adr == (word)reserved_memory_locations_enum::DMA_TRANSFER){
 			//	do something here?
 		}
+		else if(adr == (word)reserved_memory_locations_enum::CGB_MODE_ONLY);
 		else
 			mem[adr] = value;
 	}
 	else
 		mem[adr] = value;
+}
+
+byte gbe::mem_t::read_byte_from_internal_memory(word adr){		
+	if(is_ppu_blocking(adr))
+		return 0xFF;
+	if(adr == (word)reserved_memory_locations_enum::CGB_MODE_ONLY)
+		return 0xFF;
+	return mem[adr];
 }
 
 void gbe::mem_t::write_byte_to_memory(word adr, byte value){
@@ -90,10 +100,6 @@ byte gbe::mem_t::read_byte_from_memory(word adr){
 	return read_byte_from_internal_memory(adr);
 }
 void gbe::mem_t::write_word_to_memory(word adr, word value){
-	if(adr == 0xFF01){
-		printf("%c", (byte)(value >> 8));
-		printf("%c", (byte)value);
-	}
 	if(is_dma_transferring_blocking(adr))
 		return;
 	if(determine_if_bank_address(adr))
@@ -164,6 +170,9 @@ void gbe::mem_t::load_ROM(const char* rom){
 	int cartridge_mode = buffer[RESERV_LOCATION_CARTRIDGE_TYPE];
 	int rom_count = buffer[RESERV_LOCATION_ROM_SIZE];
 	int ram_count = buffer[RESERV_LOCATION_RAM_SIZE];
+	rom_info.mode = cartridge_mode;
+	rom_info.ram_size = ram_count;
+	rom_info.rom_size = rom_count;
 	this->mem_bank_controller.set_bank_type(cartridge_mode, rom_count, ram_count);
 	this->mem_bank_controller.copy_rom(reinterpret_cast<byte*>(buffer), size);
 	delete[] buffer;

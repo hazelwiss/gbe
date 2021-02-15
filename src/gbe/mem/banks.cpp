@@ -133,8 +133,7 @@ void gbe::memory_bank_controller_mbc1_t::setup_rom_and_ram_banks(){	//	The mbc1 
 }
 void gbe::memory_bank_controller_mbc1_t::determine_bank_swap(const word& adr, byte val){
 	if(adr >= 0x2000 && adr <= 0x3FFF){		//	ROM swap
-		// implement bit masking!
-		int new_bank = adr & (0b0001-1111 | (secondary_bank_register << 5)) & this->switchable_rom_banks_size;
+		int new_bank = (val & (0b0001'1111 | (secondary_bank_register << 5)));
 		if(!new_bank)
 			new_bank = 1;		
 		else if(new_bank == 0x20)
@@ -149,9 +148,9 @@ void gbe::memory_bank_controller_mbc1_t::determine_bank_swap(const word& adr, by
 	}
 	else if(adr >= 0x4000 && adr <= 0x5FFF){	//	RAM swap
 		if(this->rom_ram_mode == ROM_BANKING_MODE){
-			secondary_bank_register = val & 0b11 & this->switchable_rom_banks_size;
+			secondary_bank_register = val & 0b11;
 		} else if(this->rom_ram_mode == RAM_BANKING_MODE){
-			int new_bank = val & 0b11 & this->switchable_ram_banks_size;
+			int new_bank = val & 0b11;
 			if(!new_bank)
 				new_bank = 1;
 			this->swap_ram_bank(new_bank-1);

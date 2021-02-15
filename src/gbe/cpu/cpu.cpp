@@ -5,11 +5,40 @@
 
 void gbe::cpu_t::load_ROM(const char* file){
 	this->memory.load_ROM(file);
+	print_rom_info();
 	if(this->memory.read_byte_from_memory((int)gbe::reserved_memory_locations_enum::DISABLE_BOOT_ROM) == 0)
 		this->memory.mount_boot_rom();
 }
+void gbe::cpu_t::print_rom_info(){
+	printf("rom type: ");
+	int cartridge_mode = this->memory.get_rom_info().mode;
+	switch(cartridge_mode)
+	{
+	case 0:
+		printf("none");
+		break;
+	case 0x1:
+	case 0x2:
+	case 0x3:
+		printf("mbc1");
+		break;
+	case 0x5:
+	case 0x6:
+		printf("mbc2");
+		break;
+	default:
+		printf("N/A");
+		break;
+	}
+	printf("\n");
+	printf("rom size: %d\n", this->memory.get_rom_info().rom_size);
+	printf("ram size: %d\n", this->memory.get_rom_info().ram_size);
+}
 
+int x = 0;
 void gbe::cpu_t::emulate_fetch_decode_execute_cycle(){
+	//++x;
+	//this->print_regs();
 	check_interrupt_status();
 	byte instr_index = this->memory.read_byte_from_memory(this->regs.pc);
 	auto instr = cpu_instructions[instr_index];

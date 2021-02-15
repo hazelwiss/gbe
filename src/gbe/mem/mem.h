@@ -14,6 +14,7 @@ namespace gbe{
 		DISABLE_BOOT_ROM = 0xFF50,
 		LCD_CONTROL_REGISTER = 0xFF40,
 		LCD_STATUS_REGISTER = 0xFF41,
+		CGB_MODE_ONLY =  0xFF4D,
 		DMA_TRANSFER = 0xFF46,
 		INTERRUPT_FLAG = 0xFF0F,
 		INTERRUPT_ENABLE = 0xFFFF
@@ -24,6 +25,13 @@ namespace gbe{
 		TIMER = 0b100,
 		SERIAL = 0b1000,
 		Joypad = 0b1'0000
+	};
+	struct rom_type_info_t{
+		rom_type_info_t(){}
+		rom_type_info_t(int mode, int rom_size, int ram_size): mode{mode}, rom_size{rom_size}, ram_size{ram_size}{}
+		int mode;
+		int rom_size;
+		int ram_size;
 	};
 	struct mem_t{
 		void load_ROM(const char*);
@@ -65,7 +73,11 @@ namespace gbe{
 		void request_interrupt(byte interrupt){
 			this->interrupt_flag |= interrupt;
 		}
+		rom_type_info_t get_rom_info(){
+			return rom_info;
+		}
 	protected: 
+		rom_type_info_t rom_info;
 		//	hinders cpu to read during certain scanline periods.
 		bool is_ppu_blocking(const word& adr);
 		bool is_dma_transferring_blocking(word& adr){
@@ -74,15 +86,9 @@ namespace gbe{
 		//	handles specific cases when writing outside of the memory banks. 
 		//	Otherwise just write the value to whatever given adress.
 		void write_to_internal_memory(const word& adr, byte value);
-		byte read_byte_from_internal_memory(word adr){
-			if(is_ppu_blocking(adr))
-				return 0xFF;
-			return mem[adr];
-		}
+		byte read_byte_from_internal_memory(word adr);
 		word read_word_from_internal_memory(word adr){
-			if(is_ppu_blocking(adr))
-				return 0xFFFF;
-			return mem[adr] | (mem[adr+1] << 8);
+			return read_byte_from_internal_memory(adr) | (read_byte_from_internal_memory(adr+1) << 8);
 		}
 		struct mem_controller_t{
 			virtual ~mem_controller_t(){

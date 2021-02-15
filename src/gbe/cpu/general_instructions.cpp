@@ -226,9 +226,7 @@ gbe::branching_t gbe::general_instructions_t::misc_halt(){
 	return branching_t::DO_NOT_BRANCH;
 }
 gbe::branching_t gbe::general_instructions_t::misc_stop(){
-	//printf("STOP! ISN'T IMPLEMENTED YET!\n");
 	return branching_t::DO_BRANCH;
-	//	not sure on how to implement this one yet
 }
 void gbe::general_instructions_t::misc_di(){
 	this->cpu.request_e_interrupt = false;
