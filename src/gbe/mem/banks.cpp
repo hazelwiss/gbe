@@ -126,9 +126,9 @@ void gbe::memory_bank_controller_mbc1_t::setup_rom_and_ram_banks(){	//	The mbc1 
 	else if(this->switchable_rom_banks_size == 128)
 		this->switchable_rom_banks_size = 125;
 
-	this->switchable_rom_banks = new rom_bank_t[this->switchable_rom_banks_size];
+	this->switchable_rom_banks = new rom_bank_t[this->switchable_rom_banks_size ? switchable_rom_banks_size : 1];
 	this->swap_rom_bank(0);
-	this->switchable_ram_banks = new ram_bank_t[this->switchable_ram_banks_size];
+	this->switchable_ram_banks = new ram_bank_t[this->switchable_ram_banks_size ? switchable_ram_banks_size : 1];
 	this->swap_ram_bank(0);
 }
 void gbe::memory_bank_controller_mbc1_t::determine_bank_swap(const word& adr, byte val){

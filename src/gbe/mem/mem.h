@@ -65,6 +65,7 @@ namespace gbe{
 		}
 		void unmount_boot_rom(){
 			is_boot_rom_mounted = false;
+			mem[(int)gbe::reserved_memory_locations_enum::DISABLE_BOOT_ROM] = 1;;
 		}
 		bool get_boot_rom_mount_status(){
 			return is_boot_rom_mounted;
@@ -81,6 +82,7 @@ namespace gbe{
 		//	hinders cpu to read during certain scanline periods.
 		bool is_ppu_blocking(const word& adr);
 		bool is_dma_transferring_blocking(word& adr){
+			return false;
 			return is_dma_transfer && !(adr >= 0xFF80 && adr <= 0xFFFE);
 		}
 		//	handles specific cases when writing outside of the memory banks. 
@@ -128,7 +130,7 @@ namespace gbe{
 				return fetch_from_address(index);
 			}
 		protected:
-			byte mem[internal_memory_size+1];	//	Because we're not emulating GBC, we don't have to make WRAM exist in a bank but rather as internal memory.
+			byte mem[internal_memory_size+1]{0};	//	Because we're not emulating GBC, we don't have to make WRAM exist in a bank but rather as internal memory.
 		} mem;
 		bool is_boot_rom_mounted{false};
 		bool is_dma_transfer{false};

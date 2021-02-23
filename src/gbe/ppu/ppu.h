@@ -1,8 +1,6 @@
 #pragma once
 #include<gbe/mem/mem.h>
 #include<gbe/ppu/display.h>
-#define X_RES 160
-#define Y_RES 144
 
 namespace gbe{
 	/*
@@ -22,29 +20,42 @@ namespace gbe{
 	};
 	*/
 	struct ppu_t{
-		ppu_t(mem_t& mem): memory{mem} {
-			//memory.lcd_status_register = 0b10;
-			ly = 144;
-			memory.lcd_status_register = 0b11;
-			//sleep_dur = std::chrono::high_resolution_clock::now();
-		}
+		ppu_t(mem_t& mem): memory{mem} {}
 		void create_window(){
 			display.create_window();
 		}
 		void update(byte cycles);
 	protected:
-		void mode_3(byte& cycles);
-		void mode_2(byte& cycles);
-		void mode_1(byte& cycles);
-		void mode_0(byte& cycles);
-		void change_mode(byte mode){
-			this->memory.lcd_status_register = 0b11;
+		void update_background_in_row();
+		void update_window_in_row();
+		void update_sprite_in_row();
+		void increment_ly();
+		void v_blank_interrupt_check();
+		void stat_interrupt_check();
+		void reset();
+		byte get_tile_index(byte x, byte y, bool mode_9C00){
+			return memory.mem[
+				(mode_9C00 ? 0x9C00 : 0x9800)+
+				(x%32)+
+				((y%32)*32)];
+		}
+		word get_tile_data(byte tile_index, byte y, bool mode_8000){
+			if(mode_8000)
+				return
+					(memory.mem[0x8000+tile_index*16 + (y%8)*2] << 8) | 
+					memory.mem[0x8000+tile_index*16 + (y%8)*2 + 1];
+			return
+				(memory.mem[0x9000+((signed char)tile_index)*16 + (y%8)*2] << 8) | 
+				memory.mem[0x9000+((signed char)tile_index)*16 + (y%8)*2 + 1];
+		}
+		void change_ppu_mode(byte mode){
+			this->memory.lcd_status_register = this->memory.lcd_status_register&(~0b11);
 			this->memory.lcd_status_register |= mode & 0b11;
 		}
 		mem_t& memory;
 		display_t display; 
-		word dots{0};			//	current dot
-		byte screen[5760]{0};	//	bytes to send to sdl for rendering the window.
+		int dots{0};
+		int wl{0};
 		byte oam_buffer[1]{0};
 		//typedef std::chrono::duration<unsigned long long int, std::ratio<238, 1000000000>> gb_cycle_time;
 		//std::chrono::high_resolution_clock sleep_dur;

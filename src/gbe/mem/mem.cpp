@@ -56,10 +56,10 @@ void gbe::mem_t::write_to_internal_memory(const word& adr, byte value){
 	else if(adr >= 0xFF00 && adr <= 0xFF7F){	//	I/O registers
 		if(adr == (word)reserved_memory_locations_enum::DIVIDER_REGISTER)
 			divider_reg = 0;	//	resets the divider reigster to zero whenever a value is written to it
-		else if(adr == (word)reserved_memory_locations_enum::LCD_STATUS_REGISTER && //	only riggered during OAM scan, v/h-blank or LY=LYC
+		else if(adr == (word)reserved_memory_locations_enum::LCD_STATUS_REGISTER && //	only triggered during OAM scan, v/h-blank or LY=LYC
 			(lcd_status_register & 0b0000'0011) != 3){	
-			request_interrupt((byte)interrupt_bits::LCD_STAT);
-			mem[adr] |= (value &0b1111'1000);
+			//request_interrupt((byte)interrupt_bits::LCD_STAT);
+			//mem[adr] |= (value &0b1111'1000);
 		}
 		else if(adr == (word)reserved_memory_locations_enum::DMA_TRANSFER){
 			//	do something here?

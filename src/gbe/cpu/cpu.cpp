@@ -6,8 +6,7 @@
 void gbe::cpu_t::load_ROM(const char* file){
 	this->memory.load_ROM(file);
 	print_rom_info();
-	if(this->memory.read_byte_from_memory((int)gbe::reserved_memory_locations_enum::DISABLE_BOOT_ROM) == 0)
-		this->memory.mount_boot_rom();
+	this->memory.mount_boot_rom();
 }
 void gbe::cpu_t::print_rom_info(){
 	printf("rom type: ");
@@ -35,15 +34,16 @@ void gbe::cpu_t::print_rom_info(){
 	printf("ram size: %d\n", this->memory.get_rom_info().ram_size);
 }
 
-int x = 0;
 void gbe::cpu_t::emulate_fetch_decode_execute_cycle(){
-	//++x;
-	//this->print_regs();
+	//print_regs();
+	//flush_print_stream_to_console_and_empty();
 	check_interrupt_status();
 	byte instr_index = this->memory.read_byte_from_memory(this->regs.pc);
 	auto instr = cpu_instructions[instr_index];
-	if(this->memory.get_boot_rom_mount_status() && this->regs.pc >= 0x100)
+	if(this->memory.get_boot_rom_mount_status() && this->regs.pc >= 0x100){
 		this->memory.unmount_boot_rom();
+		printf("unmounting boot rom\n");
+	}
 	if(this->request_handle){
 		if(this->request_e_interrupt){
 			memory.enable_ime();
@@ -62,7 +62,6 @@ void gbe::cpu_t::emulate_fetch_decode_execute_cycle(){
 	diff = this->cycles.t_cycles - diff;
 	this->cycles.increment_cycles_t(instr.t_cycles+diff);
 	this->memory.increment_timer(this->cycles.t_cycles);
-	//if(this->cycles.t_cycles % 1000 == 0)
 	this->ppu.update(instr.t_cycles+diff);
 }
 

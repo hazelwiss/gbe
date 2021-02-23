@@ -80,6 +80,11 @@ namespace gbe{
 			output_stream_test << stream_test.rdbuf();
 			output_stream_test.close();
 		}
+		void flush_print_stream_to_console_and_empty(){
+			std::cout << stream_test.rdbuf();
+			stream_test.str(std::string());
+			stream_test.clear();
+		}
 	protected:
 		void check_interrupt_status();
 		struct{
