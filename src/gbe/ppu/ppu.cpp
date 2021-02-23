@@ -23,11 +23,9 @@ void gbe::ppu_t::reset(){
 	wl = 0;
 }
 void gbe::ppu_t::increment_ly(){
-	if(ly == 153)
-		reset();
 	if(ly == lcy){
-		stat_interrupt_check();
 		lcd_status |= BIT(2);
+		stat_interrupt_check();
 	} else
 		lcd_status &= ~BIT(2);
 	if(ly == 144){
@@ -36,18 +34,17 @@ void gbe::ppu_t::increment_ly(){
 		std::this_thread::sleep_for(std::chrono::milliseconds(15));
 		display.render_buffer();
 	}	
+	else if(ly == 153)
+		reset();
 	ly = (ly+1)%MAX_SCANLINES;
 }
 void gbe::ppu_t::v_blank_interrupt_check(){
 	memory.request_interrupt((byte)interrupt_bits::V_BLANK);
 }
 void gbe::ppu_t::stat_interrupt_check(){
-	if(lcd_status&BIT(6)){
+	if(lcd_status&BIT(6))
 		memory.request_interrupt((byte)interrupt_bits::LCD_STAT);
-		lcd_status |= BIT(2);
-	}
-	else
-		lcd_status &= ~BIT(2);
+	
 }
 void gbe::ppu_t::update_background_in_row(){
 	word tile_pixel_data; 
@@ -58,7 +55,7 @@ void gbe::ppu_t::update_background_in_row(){
 		tile_pixel_data = get_tile_data(tile_index, scy+ly, lcd_control&BIT(4));
 		display.draw_row_8(tile_pixel_data, 0, x*8, ly);
 	}
-	display.render_buffer();
+	display.render_buffer();	//	tmp!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 }
 void gbe::ppu_t::update_window_in_row(){
 	if(ly-wy-wl < 0)
