@@ -39,6 +39,7 @@ namespace gbe{
 		byte read_byte_from_memory(word adr);
 		void write_word_to_memory(word adr, word value);
 		word read_word_from_memory(word adr);
+		void dma_transfer(byte cycles);
 		void set_interrupt_flag(byte val){
 			this->interrupt_flag = val;
 		}
@@ -82,7 +83,6 @@ namespace gbe{
 		//	hinders cpu to read during certain scanline periods.
 		bool is_ppu_blocking(const word& adr);
 		bool is_dma_transferring_blocking(word& adr){
-			return false;
 			return is_dma_transfer && !(adr >= 0xFF80 && adr <= 0xFFFE);
 		}
 		//	handles specific cases when writing outside of the memory banks. 
@@ -134,6 +134,8 @@ namespace gbe{
 		} mem;
 		bool is_boot_rom_mounted{false};
 		bool is_dma_transfer{false};
+		word dma_transfer_source_beg{0};
+		word dma_transfer_source_end{0};
 		byte increment_divider_tmp_value{0};
 		byte increment_timer_tmp_value{0};
 		bool timer_overflow = false;

@@ -19,6 +19,14 @@ namespace gbe{
 		}
 	};
 	*/
+	struct oam_memory_t{
+		byte y;
+		byte x;
+		byte tile;
+		byte flags;
+		byte is_x16{false};
+	};
+
 	struct ppu_t{
 		ppu_t(mem_t& mem): memory{mem} {}
 		void create_window(){
@@ -30,8 +38,8 @@ namespace gbe{
 		void update_window_in_row();
 		void update_sprite_in_row();
 		void increment_ly();
-		void v_blank_interrupt_check();
-		void stat_interrupt_check();
+		void v_blank_interrupt();
+		void stat_interrupt();
 		void reset();
 		byte get_tile_index(byte x, byte y, bool mode_9C00){
 			return memory.mem[
@@ -52,11 +60,13 @@ namespace gbe{
 			this->memory.lcd_status_register = this->memory.lcd_status_register&(~0b11);
 			this->memory.lcd_status_register |= mode & 0b11;
 		}
+		//	returns amount of sprite oam data in a scanline/row.
+		byte get_sprites_in_row(oam_memory_t data_reference[40], byte y);	
 		mem_t& memory;
 		display_t display; 
 		int dots{0};
 		int wl{0};
-		byte oam_buffer[1]{0};
+		int scanline_oam_time_delay{0};
 		//typedef std::chrono::duration<unsigned long long int, std::ratio<238, 1000000000>> gb_cycle_time;
 		//std::chrono::high_resolution_clock sleep_dur;
 		byte& lcd_control{memory.mem.fetch_from_address((word)reserved_memory_locations_enum::LCD_CONTROL_REGISTER)};
@@ -67,6 +77,9 @@ namespace gbe{
 		byte& lcy{memory.mem.fetch_from_address(0xFF45)};
 		byte& wy{memory.mem.fetch_from_address(0xFF4A)};
 		byte& wx{memory.mem.fetch_from_address(0xFF4B)};
+		byte& bgp{memory.mem[0xFF47]};
+		byte& obp0{memory.mem[0xFF48]};
+		byte& obp1{memory.mem[0xFF49]};
 	};
 }
 

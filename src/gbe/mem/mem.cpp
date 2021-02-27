@@ -4,6 +4,8 @@
 #define RESERV_LOCATION_ROM_SIZE static_cast<int>(reserved_memory_locations_enum::ROM_SIZE)
 #define RESERV_LOCATION_RAM_SIZE static_cast<int>(reserved_memory_locations_enum::RAM_SIZE)
 #define RESERV_LOCATION_CARTRIDGE_TYPE static_cast<int>(reserved_memory_locations_enum::CARTRIDGE_TYPE)
+#define OAM_MEMORY_BUFFER_SIZE 160
+#define OAM_MEMORY_BUFFER_START_ADDRESS 0xFE00
 
 byte gbe::mem_t::boot_rom[256]{
 	0x31, 0xfe, 0xff, 0xaf, 0x21, 0xff, 0x9f, 0x32, 0xcb, 0x7c, 0x20, 0xfb, 0x21, 0x26, 0xff, 0x0e,
@@ -29,7 +31,6 @@ inline bool determine_if_bank_address(const word& adr){
 }
 
 bool gbe::mem_t::is_ppu_blocking(const word& adr){
-	return false; //tmp
 	byte mode = lcd_status_register & 0x0000-0011;
 	if(adr >= 0xFE00 && adr <= 0xFE9F){
 		if(mode > 1)
@@ -40,6 +41,19 @@ bool gbe::mem_t::is_ppu_blocking(const word& adr){
 			return true;
 	}
 	return false;
+}
+
+void gbe::mem_t::dma_transfer(byte cycles){
+	if(is_dma_transfer){
+		for(int i = 0; i < cycles/4 && dma_transfer_source_beg+i < dma_transfer_source_end; ++i){
+			mem[OAM_MEMORY_BUFFER_START_ADDRESS] = mem[dma_transfer_source_beg+i];
+		}
+		if(dma_transfer_source_beg+cycles/4 > OAM_MEMORY_BUFFER_SIZE){
+			is_dma_transfer = false;
+			return;
+		}
+		dma_transfer_source_beg += cycles/4;
+	}
 }
 
 void gbe::mem_t::write_to_internal_memory(const word& adr, byte value){	
@@ -62,9 +76,13 @@ void gbe::mem_t::write_to_internal_memory(const word& adr, byte value){
 			//mem[adr] |= (value &0b1111'1000);
 		}
 		else if(adr == (word)reserved_memory_locations_enum::DMA_TRANSFER){
-			//	do something here?
+			if(!is_dma_transfer){
+				this->is_dma_transfer = true;
+				this->dma_transfer_source_beg = value << 8;
+				this->dma_transfer_source_end = (value << 8) | (OAM_MEMORY_BUFFER_SIZE-1);
+			}
 		}
-		else if(adr == (word)reserved_memory_locations_enum::CGB_MODE_ONLY);
+		else if(adr == (word)reserved_memory_locations_enum::CGB_MODE_ONLY);	//	do nothing here
 		else
 			mem[adr] = value;
 	}
