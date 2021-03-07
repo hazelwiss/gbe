@@ -31,6 +31,7 @@ inline bool determine_if_bank_address(const word& adr){
 }
 
 bool gbe::mem_t::is_ppu_blocking(const word& adr){
+	return false;
 	byte mode = lcd_status_register & 0x0000-0011;
 	if(adr >= 0xFE00 && adr <= 0xFE9F){
 		if(mode > 1)

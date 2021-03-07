@@ -83,6 +83,7 @@ namespace gbe{
 		//	hinders cpu to read during certain scanline periods.
 		bool is_ppu_blocking(const word& adr);
 		bool is_dma_transferring_blocking(word& adr){
+			return false;
 			return is_dma_transfer && !(adr >= 0xFF80 && adr <= 0xFFFE);
 		}
 		//	handles specific cases when writing outside of the memory banks. 

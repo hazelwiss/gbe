@@ -25,7 +25,19 @@ int gbe::display_t::determine_colour(byte bits){
 	return this->colour_array[bits];
 }
 
-void gbe::display_t::draw_row_8(word data, byte palette, int x, int y, bool background_priority, bool sprite){
+void gbe::display_t::draw_row_8(int x, int y, byte row[8]){
+	if(y >= SCR_H)
+		return;
+	int* pixel_buffer = reinterpret_cast<int*>(surface_handler->pixels)+x+y*SCR_W;
+	int* end_of_buffer = pixel_buffer+SCR_W;
+	for(int i = 0; i < 8; ++i, ++pixel_buffer){
+		if(pixel_buffer >= end_of_buffer || x+i >= SCR_W)
+			break;
+		*pixel_buffer = this->colour_array[row[i]&0b11];
+	}
+}
+
+/*void gbe::display_t::draw_row_8(word data, byte palette, int x, int y, bool background_priority, bool sprite){
 	int* pntr;
 	if(sprite)
 		pntr = this->sprite_buffer+y*SCR_W+x;
@@ -53,13 +65,13 @@ void gbe::display_t::draw_row_8(word data, byte palette, int x, int y, bool back
 				else 
 					*pntr = determine_colour((palette&(0b11<<(bits*2)))>>(bits*2));
 			}
-}
+}*/
 
 void gbe::display_t::render_buffer(){
-	auto& surface = *this->surface_handler;
-	for(int i = 0; i < SCR_W*SCR_H; ++i){	
-		((int*)surface.pixels)[i] = sprite_buffer[i] ? sprite_buffer[i] : background_buffer[i];
-	}
+	//auto& surface = *this->surface_handler;
+	//for(int i = 0; i < SCR_W*SCR_H; ++i){	
+	//	((int*)surface.pixels)[i] = sprite_buffer[i] ? sprite_buffer[i] : background_buffer[i];
+	//}
 	SDL_UpdateWindowSurface(this->window_handle);
 	//SDL_RenderPresent(this->renderer_handle);
 }

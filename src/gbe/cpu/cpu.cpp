@@ -35,8 +35,9 @@ void gbe::cpu_t::print_rom_info(){
 }
 
 void gbe::cpu_t::emulate_fetch_decode_execute_cycle(){
-	//print_regs();
-	//flush_print_stream_to_console_and_empty();
+	this->ppu.update();
+	if(++cur_cycles < cur_instruction_cycles)
+		return;
 	check_interrupt_status();
 	byte instr_index = this->memory.read_byte_from_memory(this->regs.pc);
 	auto instr = cpu_instructions[instr_index];
@@ -60,10 +61,12 @@ void gbe::cpu_t::emulate_fetch_decode_execute_cycle(){
 	if(instr.func(*this))
 		this->regs.pc += instr.byte_length;
 	diff = this->cycles.t_cycles - diff;
+	int passed_cycles = instr.t_cycles+diff;
 	check_dma_status(diff);
-	this->cycles.increment_cycles_t(instr.t_cycles+diff);
+	this->cycles.increment_cycles_t(passed_cycles);
 	this->memory.increment_timer(this->cycles.t_cycles);
-	this->ppu.update(instr.t_cycles+diff);
+	cur_cycles = 0;
+	cur_instruction_cycles = passed_cycles;
 }
 
 void gbe::cpu_t::check_interrupt_status(){

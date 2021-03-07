@@ -57,140 +57,223 @@ void order_array(gbe::oam_memory_t data[MAX_SPRITES_ON_SCANLINE], int count){
 	}
 }
 
-void gbe::ppu_t::update(byte cycles){
-	//	nintendo logo is scrolling background! tilemap in 9900 something!
-	//	background fixing	
-	if(!(lcd_control&BIT(7)))
+byte determine_colour_index(gbe::fifo_pixel pixel){
+	return (pixel.palette>>(pixel.colour*2))&0b11;
+}
+
+void get_fifo_pixel_data(byte rtrn_data[PIXELS_IN_FIFO], const gbe::fifo& fifo){
+	for(int i = 0; i < sizeof(fifo.pixels)/sizeof(*fifo.pixels); ++i)
+		rtrn_data[i] = determine_colour_index(fifo.pixels[i]);
+}
+
+void gbe::ppu_t::set_fifo_pixels_with_tile_data(fifo& f, byte palette){
+	byte tile_data_high = f.cur_tile.tile_data_high;
+	byte tile_data_low = f.cur_tile.tile_data_low;
+	for(int i = 0; i < 8; ++i){
+		f.pixels[7-i].colour = (((tile_data_high>>i)&0b1)<<1) | ((tile_data_low>>i)&0b1);
+		f.pixels[7-i].palette = palette;
+	}
+}
+
+void gbe::ppu_t::get_background_tile(){
+	auto& bf = background_fifo;
+	bool mode_9C00 =  scx+bf.x*8 >= wx-7 && scy+ly >= wy && lcd_control&BIT(5) ? lcd_control&BIT(6) : lcd_control&BIT(3);
+	word index = (((scx/8)+background_fifo.x)%32)+
+		(((scy+ly)/8)%32)*32;
+	if(mode_9C00){
+		index+=0x9C00;
+	} else{
+		index+=0x9800;
+	}
+	bool mode_8000 = lcd_control&BIT(4);
+	byte tile = memory.mem[index];
+	word address;
+	if(mode_8000)
+		address = 0x8000+(tile*16)+((scy+ly)%8)*2;
+	else
+		address = 0x9000+(((signed char)tile)*16)+((scy+ly)%8)*2;
+	bf.cur_tile.tile_index = tile;
+	bf.cur_tile.vram_address = address;
+	
+	bf.cur_tile.tile_data_low = (memory.mem[address+1] << (scx%8)) | (memory.mem[address+17] >> (8-(scx%8)));
+	bf.cur_tile.tile_data_high = (memory.mem[address] << (scx%8)) | (memory.mem[address+16] >> (8-(scx%8)));
+	set_fifo_pixels_with_tile_data(bf, bgp);
+}
+
+void gbe::ppu_t::get_window_tile(){
+	auto& bf = background_fifo;
+	if(background_fifo.x*8 < wx-7 || ly < wl)
 		return;
-	if(dots < 80 && (dots+cycles) > SCANNING_OAM_TIME){
-		//	scanning oam.
+	word x = background_fifo.x*8-(wx-7);
+	word y = ly-wl;
+	bool mode_9C00 = lcd_control&BIT(6);
+	word index = ((x/8)%32)+
+		((y/8)%32)*32;
+	if(mode_9C00){
+		index+=0x9C00;
+	} else{
+		index+=0x9800;
+	}
+	bool mode_8000 = lcd_control&BIT(4);
+	byte tile = memory.mem[index];
+	word address;
+	if(mode_8000)
+		address = 0x8000+(tile*16)+(y%8)*2;
+	else
+		address = 0x9000+(((signed char)tile)*16)+(y%8)*2;
+	bf.cur_tile.tile_index = tile;
+	bf.cur_tile.vram_address = address;
+	bf.cur_tile.tile_data_low = memory.mem[address+1];
+	bf.cur_tile.tile_data_high = memory.mem[address];
+	set_fifo_pixels_with_tile_data(bf, bgp);
+}
+
+void gbe::ppu_t::push_background_fifo(){
+	byte row[PIXELS_IN_FIFO]{0};
+	get_fifo_pixel_data(row, background_fifo);
+	display.draw_row_8(background_fifo.x*8, ly, row);
+}
+
+void gbe::ppu_t::push_window_fifo(){
+	if(ly >= wl || background_fifo.x*8 < wx-7)
+		return;
+	window_has_drawn_pixel = true;
+	byte row[PIXELS_IN_FIFO]{0};
+	get_fifo_pixel_data(row, background_fifo);
+	display.draw_row_8(background_fifo.x*8, ly, row);
+}
+
+void gbe::ppu_t::update(){
+	if(lcd_control&BIT(7) == 0)
+		return;
+	if(dots == 80-1){
 		change_ppu_mode(MODE_3);
-	}
-	if((dots+cycles)%(OAM_SCAN_BASE_TIME+scanline_oam_time_delay) < dots%OAM_SCAN_BASE_TIME){
-		//	h-blanking
-		if(ly == lcy){
-			lcd_status |= BIT(2);
-			lcd_status |= BIT(6);
-		} else{
-			lcd_status &= ~BIT(2);
-			lcd_status &= ~BIT(6);
-		}
-		stat_interrupt();
+		on_oam_end();
+	} else if(dots >= 80 && background_fifo.x < 20){
+		on_draw();
+	} else if(dots == 80+168){
 		change_ppu_mode(MODE_0);
+		on_draw_end();
 	} 
-	if((dots+cycles)%DOTS_PER_SCANLINE < dots){
-		//	new scanline
-		if(lcd_control&BIT(0) && ly < SCR_H){
-			update_background_in_row();
-			if(lcd_control&BIT(5))
-				update_window_in_row();
-		}
-		if(lcd_control&BIT(1))
-			update_sprite_in_row();
-		increment_ly();
+	if(dots+1 >= DOTS_PER_SCANLINE){
+		on_new_scanline();
+	} else
+		++dots;
+}
+
+void gbe::ppu_t::on_oam_end(){
+	if(ly == lcy){
+		lcd_status|=BIT(6);
+		lcd_status|=BIT(2);
+	} else{
+		lcd_status&=~BIT(6);
+		lcd_status&=~BIT(2);
 	}
-	dots = (dots+cycles)%DOTS_PER_SCANLINE;
+	stat_interrupt();
 }
-void gbe::ppu_t::reset(){
-	wl = 0;
-	scanline_oam_time_delay = 0;
-	change_ppu_mode(MODE_2);
+
+void gbe::ppu_t::on_draw(){
+	if(lcd_control&BIT(0)){
+		if(lcd_control&BIT(5)){
+			if(bg_drawing)
+				update_bg();
+			else
+				update_wn();
+		}
+		else 
+			update_bg();
+	}
 }
-void gbe::ppu_t::increment_ly(){
-	if(ly == 144){
-		//	v-blanking
-		//	sleep properly!
-		v_blank_interrupt();
-		//std::this_thread::sleep_for(std::chrono::milliseconds(15));
-		display.render_buffer();
-		change_ppu_mode(MODE_1);
-	}	
-	else if(ly == 153)
+
+void gbe::ppu_t::on_draw_end(){
+
+}
+
+void gbe::ppu_t::on_new_scanline(){		
+	++ly;
+	if(window_has_drawn_pixel){
+		++wl;
+		window_has_drawn_pixel = false;
+	}
+	dots = 0;
+	background_fifo.x = 0;
+	lcd_interrupt_fired = false;
+	if(ly == 144)
+		v_blank();
+	if(ly == MAX_SCANLINES)
 		reset();
-	ly = (ly+1)%MAX_SCANLINES;
 }
-void gbe::ppu_t::v_blank_interrupt(){
+
+void gbe::ppu_t::stat_interrupt(){
+	int mode = lcd_status&0b11;
+	bool should_interrupt = !lcd_interrupt_fired &&(
+		lcd_status&BIT(3)	||
+		lcd_status&BIT(4)	||
+		lcd_status&BIT(5)	||
+		lcd_status&BIT(6));
+	if(should_interrupt){
+		fire_lcd_interrupt();
+	}
+}
+
+void gbe::ppu_t::v_blank(){
+	std::this_thread::sleep_for(std::chrono::milliseconds(10));
+	change_ppu_mode(MODE_1);
+	display.render_buffer();
 	memory.request_interrupt((byte)interrupt_bits::V_BLANK);
 }
-void gbe::ppu_t::stat_interrupt(){
-	if(lcd_status&BIT(6))
-		memory.request_interrupt((byte)interrupt_bits::LCD_STAT);
+
+void gbe::ppu_t::reset(){
+	wl = 0;
+	ly = 0;
+	change_ppu_mode(MODE_2);
+	reset_fifos();
 }
-byte gbe::ppu_t::get_sprites_in_row(oam_memory_t data_reference[MAX_SPRITES_ON_SCANLINE], byte y){
-	int sprites[MAX_SPRITES_ON_SCANLINE];
-	int array_size{0};
-	int sprite_height = lcd_status&BIT(2) ? 16 : 8;
-	for(int i = 0; i < SPRITES_IN_OAM; ++i){
-		int indx = 0xFE00+i*4;
-		int sprite_y = memory.mem[indx]-16;
-		if(y < sprite_y+sprite_height && y >= sprite_y && memory.mem[indx+1] > 0){
-			sprites[array_size++] = 
-				(sprite_y<<24) 					| 
-				((memory.mem[indx+1]-8)<<16) 	| 
-				(memory.mem[indx+2]<<8) 		| 
-				memory.mem[indx+3];
-		}
-		if(array_size >= MAX_SPRITES_ON_SCANLINE)
-			break;
-	}
-	int loop = array_size;
-	while(loop--){
-		auto& sprite = sprites[loop];
-		data_reference[loop].y 		= (sprite >> 24);
-		data_reference[loop].x 		= (sprite >> 16);
-		data_reference[loop].tile	= (sprite >> 8);
-		data_reference[loop].flags 	= sprite;
-	}
-	order_array(data_reference, array_size);
-	return array_size;
+
+void gbe::ppu_t::reset_fifos(){
+	background_fifo = fifo();
+	sprite_fifo = fifo();
 }
-void gbe::ppu_t::update_background_in_row(){
-	word tile_pixel_data; 
-	byte tile_index;
-	for(int x = 0; x < SCR_W/8; ++x){
-		tile_index = get_tile_index((scx/8)+x, (scy+ly)/8, 
-			x >= wx-7 && ly >= wy && lcd_control&BIT(5) ? lcd_control&BIT(6) : lcd_control&BIT(3));
-		tile_pixel_data = get_tile_data(tile_index, scy+ly, lcd_control&BIT(4));
-		display.draw_row_8(tile_pixel_data, bgp, x*8, ly, false, false);
+
+void gbe::ppu_t::update_bg(){
+	switch(background_fifo.cur_step)
+	{
+	case 0:
+		get_background_tile();
+		break;
+	case 1:
+		break;
+	case 2:
+		break;
+	case 3:
+		push_background_fifo();
+		break;
+	case 4:
+		if(lcd_control&BIT(5))
+			bg_drawing = !bg_drawing;
+		else 
+			++background_fifo.x;
+		break;
 	}
+	background_fifo.inc_step();
 }
-void gbe::ppu_t::update_window_in_row(){
-	if(ly-wy-wl < 0)
-		return;
-	word tile_pixel_data;
-	byte tile_index;
-	for(int x = (wx-7); x < SCR_W; x+=8){
-		tile_index = get_tile_index((x-wx+7)/8, wl/8, lcd_control&BIT(6));
-		tile_pixel_data = get_tile_data(tile_index, wl, lcd_control&BIT(4));
-		display.draw_row_8(tile_pixel_data, bgp, x, ly, false, false);
+void gbe::ppu_t::update_wn(){
+	switch(background_fifo.cur_step)
+	{
+	case 0:
+		get_window_tile();
+		break;
+	case 1:
+		break;
+	case 2:
+		break;
+	case 3:
+		push_window_fifo();
+		break;
+	case 4:
+		bg_drawing = !bg_drawing;
+		++background_fifo.x;
+		break;
 	}
-	if(wx-7 < SCR_W)
-		++wl;
-}
-void gbe::ppu_t::update_sprite_in_row(){
-	oam_memory_t sprites[MAX_SPRITES_ON_SCANLINE];
-	byte amount_of_sprites = get_sprites_in_row(sprites, ly);
-	byte tile_pixel_data;
-	int vert_pos;
-	int flip_offset = lcd_status&BIT(2) ? 15 : 7;
-	for(int i = 0; i < amount_of_sprites; ++i){
-		const auto& sprite = sprites[i];
-		if(sprite.flags&BIT(6))	//	vertical mirror
-			vert_pos = sprite.y+7-ly;
-		else
-			vert_pos = ly-sprite.y;
-		int tile_number = sprite.tile;
-		if(lcd_status&BIT(2)){
-			if(vert_pos%16 > 7)
-				tile_number&=~0b1;
-			else
-				tile_number|=0b1;
-		}
-		tile_pixel_data = get_tile_data(sprite.tile, vert_pos, true);
-		if(sprite.flags&BIT(5))
-			tile_pixel_data = reverse_pixel_data(tile_pixel_data);
-		display.draw_row_8(tile_pixel_data,
-			(sprite.flags&BIT(4) ? obp0 : obp1), 
-			sprite.x, ly, sprite.flags&BIT(7), true);
-	}
+	background_fifo.inc_step();
 }

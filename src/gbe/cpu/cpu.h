@@ -118,6 +118,8 @@ namespace gbe{
 			unsigned long long t_cycles{0};
 			unsigned long long m_cycles{0};
 		} cycles;
+		int cur_cycles{0};
+		int cur_instruction_cycles{0};
 		mem_t memory;
 		ppu_t ppu{memory};
 		bool request_e_interrupt{0}, request_d_interrupt{0}, request_handle{0};
