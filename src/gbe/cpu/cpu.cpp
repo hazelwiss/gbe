@@ -39,6 +39,7 @@ void gbe::cpu_t::emulate_fetch_decode_execute_cycle(){
 	if(++cur_cycles < cur_instruction_cycles)
 		return;
 	check_interrupt_status();
+	check_joypad_input();
 	byte instr_index = this->memory.read_byte_from_memory(this->regs.pc);
 	auto instr = cpu_instructions[instr_index];
 	if(this->memory.get_boot_rom_mount_status() && this->regs.pc >= 0x100){
@@ -100,6 +101,30 @@ void gbe::cpu_t::check_interrupt_status(){
 		}
 		memory.disable_ime();
 	}
+}
+
+void gbe::cpu_t::check_joypad_input(){
+	byte input_register = memory.read_byte_from_memory((word)reserved_memory_locations_enum::JOYPAD_REG);
+	byte directions = 0;
+	byte buttons	= 0;
+	directions 	|= (keyboard[SDL_SCANCODE_D] == 0);
+	directions 	|= (keyboard[SDL_SCANCODE_A] == 0) << 1;
+	directions 	|= (keyboard[SDL_SCANCODE_W] == 0) << 2;
+	directions 	|= (keyboard[SDL_SCANCODE_S] == 0) << 3;
+	buttons		|= (keyboard[SDL_SCANCODE_M] == 0);
+	buttons		|= (keyboard[SDL_SCANCODE_N] == 0) << 1;
+	buttons 	|= (keyboard[SDL_SCANCODE_K] == 0) << 2;
+	buttons		|= (keyboard[SDL_SCANCODE_L] == 0) << 3;
+	byte low_bits = 0x0F;
+	if(input_register&BIT(4)) 
+		low_bits &= directions;
+	if(input_register&BIT(5)) 
+		low_bits &= buttons;
+	if(~low_bits){
+		memory.request_interrupt((byte)interrupt_bits::Joypad);
+	}
+	input_register = (input_register&0xF0) + low_bits;
+	memory.write_byte_to_memory((word)reserved_memory_locations_enum::JOYPAD_REG, input_register);
 }
 
 #define INSTRUCTION cpu.instructions

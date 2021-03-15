@@ -37,36 +37,6 @@ void gbe::display_t::draw_row_8(int x, int y, byte row[8]){
 	}
 }
 
-/*void gbe::display_t::draw_row_8(word data, byte palette, int x, int y, bool background_priority, bool sprite){
-	int* pntr;
-	if(sprite)
-		pntr = this->sprite_buffer+y*SCR_W+x;
-	else  
-		pntr = this->background_buffer+y*SCR_W+x;
-	if(y >= 0 && y < SCR_H && x >= 0 && x < SCR_W)
-		if(background_priority)
-			for(int i = 0; i < 8 && x+i < SCR_W; ++i, ++pntr){
-				byte bit1 = (data&BIT(15-i)) >> (15-i);
-				byte bit2 = (data&BIT(7-i)) >> (7-i);
-				byte bits = (bit1<<1)|bit2;
-				if(sprite && !bits)
-					(*pntr) = 0;
-				else
-					if(*(this->background_buffer+y*SCR_W+x+i) == determine_colour(palette&0b11))	
-						*pntr = determine_colour((palette&(0b11<<(bits*2)))>>(bits*2));
-			}
-		else 
-			for(int i = 0; i < 8 && x+i < SCR_W; ++i, ++pntr){
-				byte bit1 = (data&BIT(15-i)) >> (15-i);
-				byte bit2 = (data&BIT(7-i)) >> (7-i);
-				byte bits = (bit1<<1)|bit2;
-				if(sprite && !bits)
-					*pntr = 0;
-				else 
-					*pntr = determine_colour((palette&(0b11<<(bits*2)))>>(bits*2));
-			}
-}*/
-
 void gbe::display_t::render_buffer(){
 	//auto& surface = *this->surface_handler;
 	//for(int i = 0; i < SCR_W*SCR_H; ++i){	

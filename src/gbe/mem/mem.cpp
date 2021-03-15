@@ -77,11 +77,15 @@ void gbe::mem_t::write_to_internal_memory(const word& adr, byte value){
 			//mem[adr] |= (value &0b1111'1000);
 		}
 		else if(adr == (word)reserved_memory_locations_enum::DMA_TRANSFER){
-			if(!is_dma_transfer){
-				this->is_dma_transfer = true;
-				this->dma_transfer_source_beg = value << 8;
-				this->dma_transfer_source_end = (value << 8) | (OAM_MEMORY_BUFFER_SIZE-1);
+			for(int i = 0; i < OAM_MEMORY_BUFFER_SIZE; ++i){
+				write_to_internal_memory(OAM_MEMORY_BUFFER_START_ADDRESS+i,
+					read_byte_from_memory((value<<8)+i));
 			}
+			//if(!is_dma_transfer){
+				//this->is_dma_transfer = true;
+				//this->dma_transfer_source_beg = value << 8;
+				//this->dma_transfer_source_end = (value << 8) | (OAM_MEMORY_BUFFER_SIZE-1);
+			//}
 		}
 		else if(adr == (word)reserved_memory_locations_enum::CGB_MODE_ONLY);	//	do nothing here
 		else
@@ -100,8 +104,6 @@ byte gbe::mem_t::read_byte_from_internal_memory(word adr){
 }
 
 void gbe::mem_t::write_byte_to_memory(word adr, byte value){
-	if(adr == 0xFF01)
-		printf("%c", value);
 	if(is_dma_transferring_blocking(adr))
 		return;
 	if(determine_if_bank_address(adr))

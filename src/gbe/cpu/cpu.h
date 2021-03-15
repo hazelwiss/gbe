@@ -27,6 +27,9 @@ inline std::ostream& operator<<(std::ostream& o, const to_hex_t& hex){
 
 namespace gbe{
 	struct cpu_t{
+		cpu_t(){
+			keyboard = SDL_GetKeyboardState(NULL);
+		}
 		//	Public method declaration.
 		void emulate_fetch_decode_execute_cycle();
 		void create_window(){
@@ -90,6 +93,7 @@ namespace gbe{
 		void check_dma_status(int cycles_passed_since_last_execution){
 			memory.dma_transfer(cycles_passed_since_last_execution);
 		}
+		void check_joypad_input();
 		struct{
 			union{
 				struct{
@@ -120,6 +124,7 @@ namespace gbe{
 		} cycles;
 		int cur_cycles{0};
 		int cur_instruction_cycles{0};
+		const byte* keyboard;
 		mem_t memory;
 		ppu_t ppu{memory};
 		bool request_e_interrupt{0}, request_d_interrupt{0}, request_handle{0};

@@ -7,22 +7,18 @@
 #define OAM_SCAN_BASE_TIME 248
 #define SCANNING_OAM_TIME 80
 #define MAX_SPRITES_ON_SCANLINE 10
-#define SPRITES_IN_OAM 40
 #define MODE_0 0
 #define MODE_1 1
 #define MODE_2 2
 #define MODE_3 3
+#define OAM_START_ADDRESS 0xFE00
 
-word reverse_pixel_data(word data){
+byte reverse_half_row_data(byte data){
 	byte fb = data;
-	byte sb = data>>8;
 	fb = (fb&0xF0) >> 4 | (fb&0x0F) << 4;
    	fb = (fb&0xCC) >> 2 | (fb&0x33) << 2;
    	fb = (fb&0xAA) >> 1 | (fb&0x55) << 1;
-   	sb = (sb&0xF0) >> 4 | (sb&0x0F) << 4;
-   	sb = (sb&0xCC) >> 2 | (sb&0x33) << 2;
-   	sb = (sb&0xAA) >> 1 | (sb&0x55) << 1;
-	return fb | (sb<<8);
+	return fb;
 }
 
 void order_array(gbe::oam_memory_t data[MAX_SPRITES_ON_SCANLINE], int count){
@@ -66,90 +62,134 @@ void get_fifo_pixel_data(byte rtrn_data[PIXELS_IN_FIFO], const gbe::fifo& fifo){
 		rtrn_data[i] = determine_colour_index(fifo.pixels[i]);
 }
 
-void gbe::ppu_t::set_fifo_pixels_with_tile_data(fifo& f, byte palette){
-	byte tile_data_high = f.cur_tile.tile_data_high;
-	byte tile_data_low = f.cur_tile.tile_data_low;
+void gbe::ppu_t::set_fifo_pixels_with_tile_data(fifo& f,  byte palette, byte priority, int shift){
+	byte tile_data_high = pixel_fetcher.cur_tile.tile_data_high;
+	byte tile_data_low	=  pixel_fetcher.cur_tile.tile_data_low;
+	if(shift>0){
+		tile_data_high 	<<= shift;
+		tile_data_low	<<= shift;
+	} else if(shift<0){
+		shift*=-1;
+		tile_data_high 	>>= shift;
+		tile_data_low	>>= shift;
+	}
+
 	for(int i = 0; i < 8; ++i){
 		f.pixels[7-i].colour = (((tile_data_high>>i)&0b1)<<1) | ((tile_data_low>>i)&0b1);
 		f.pixels[7-i].palette = palette;
+		f.pixels[7-i].backround_priority = (bool)priority;
 	}
+}
+
+gbe::tile gbe::ppu_t::get_bg_fifo_tile(byte x, byte y, byte palette, bool mode_9C00, bool mode_8000){
+	word index_y = ((y/8)&0x1F)*32;
+	word index   = (((x/8)&0x1F)+index_y)%(32*32);
+	word index2  = ((((x+8)/8)&0x1F)+index_y)%(32*32);
+	if(mode_9C00){
+		index	+= 0x9C00;
+		index2	+= 0x9C00;
+	} else{
+		index	+= 0x9800;
+		index2	+= 0x9800;
+	}
+	byte tile = memory.mem[index];
+	byte tile2 = memory.mem[index2];
+	word address;
+	word address2;
+	if(mode_8000){
+		address 	= 0x8000+(tile*16)+(y%8)*2;
+		address2 	= 0x8000+(tile2*16)+(y%8)*2;
+	} else{
+		address 	= 0x9000+(((signed char)tile)*16)+(y%8)*2;
+		address2 	= 0x9000+(((signed char)tile2)*16)+(y%8)*2;
+	}
+	gbe::tile rtrn;
+	rtrn.tile_data_low	= (memory.mem[address]<<(x%8)) 	 | (memory.mem[address2]>>(8-(x%8)));
+	rtrn.tile_data_high = (memory.mem[address+1]<<(x%8)) | (memory.mem[address2+1]>>(8-(x%8)));
+	return rtrn;
+}
+
+gbe::tile gbe::ppu_t::get_sprite_fifo_tile(byte tile_index, byte y, bool x_flip, bool is_16_height){
+	if(is_16_height)
+		tile_index&=~0b1;
+	word address = 0x8000+(tile_index)*16+(y%16)*2;
+	gbe::tile rtrn;
+	byte low  = x_flip ? reverse_half_row_data(memory.mem[address]) 	: memory.mem[address];
+	byte high = x_flip ? reverse_half_row_data(memory.mem[address+1])	: memory.mem[address+1];
+	rtrn.tile_data_low	= low;
+	rtrn.tile_data_high = high;
+	return rtrn;
+}
+
+void gbe::ppu_t::set_bg_fifo_tile(fifo& f, byte x, byte y, byte palette, bool mode_9C00, bool mode_8000){
+	pixel_fetcher.cur_tile = get_bg_fifo_tile(x, y, palette, mode_9C00, mode_8000);
+	set_fifo_pixels_with_tile_data(f, palette, 1, 0);
 }
 
 void gbe::ppu_t::get_background_tile(){
-	auto& bf = background_fifo;
-	bool mode_9C00 =  scx+bf.x*8 >= wx-7 && scy+ly >= wy && lcd_control&BIT(5) ? lcd_control&BIT(6) : lcd_control&BIT(3);
-	word index = (((scx/8)+background_fifo.x)%32)+
-		(((scy+ly)/8)%32)*32;
-	if(mode_9C00){
-		index+=0x9C00;
+	auto& pf = pixel_fetcher;
+	bool mode_9C00;
+	bool mode_8000;
+	byte x;
+	byte y;
+	if(lcd_control&BIT(5) && pf.x*8 >= wx-7 && ly >= wy){
+		mode_9C00 = lcd_control&BIT(6);
+		x = pf.x*8-(wx-7);
+		y = wl;
+		window_has_drawn_pixel = true;
 	} else{
-		index+=0x9800;
+		mode_9C00 = lcd_control&BIT(3);
+		x = scx+pf.x*8;
+		y = scy+ly;
 	}
-	bool mode_8000 = lcd_control&BIT(4);
-	byte tile = memory.mem[index];
-	word address;
-	if(mode_8000)
-		address = 0x8000+(tile*16)+((scy+ly)%8)*2;
-	else
-		address = 0x9000+(((signed char)tile)*16)+((scy+ly)%8)*2;
-	bf.cur_tile.tile_index = tile;
-	bf.cur_tile.vram_address = address;
-	
-	bf.cur_tile.tile_data_low = (memory.mem[address+1] << (scx%8)) | (memory.mem[address+17] >> (8-(scx%8)));
-	bf.cur_tile.tile_data_high = (memory.mem[address] << (scx%8)) | (memory.mem[address+16] >> (8-(scx%8)));
-	set_fifo_pixels_with_tile_data(bf, bgp);
-}
-
-void gbe::ppu_t::get_window_tile(){
-	auto& bf = background_fifo;
-	if(background_fifo.x*8 < wx-7 || ly < wl)
-		return;
-	word x = background_fifo.x*8-(wx-7);
-	word y = ly-wl;
-	bool mode_9C00 = lcd_control&BIT(6);
-	word index = ((x/8)%32)+
-		((y/8)%32)*32;
-	if(mode_9C00){
-		index+=0x9C00;
-	} else{
-		index+=0x9800;
-	}
-	bool mode_8000 = lcd_control&BIT(4);
-	byte tile = memory.mem[index];
-	word address;
-	if(mode_8000)
-		address = 0x8000+(tile*16)+(y%8)*2;
-	else
-		address = 0x9000+(((signed char)tile)*16)+(y%8)*2;
-	bf.cur_tile.tile_index = tile;
-	bf.cur_tile.vram_address = address;
-	bf.cur_tile.tile_data_low = memory.mem[address+1];
-	bf.cur_tile.tile_data_high = memory.mem[address];
-	set_fifo_pixels_with_tile_data(bf, bgp);
+	mode_8000 = lcd_control&BIT(4);
+	set_bg_fifo_tile(background_fifo, x, y, bgp, mode_9C00, mode_8000);
 }
 
 void gbe::ppu_t::push_background_fifo(){
-	byte row[PIXELS_IN_FIFO]{0};
+	byte row[PIXELS_IN_FIFO];
 	get_fifo_pixel_data(row, background_fifo);
-	display.draw_row_8(background_fifo.x*8, ly, row);
+	display.draw_row_8(pixel_fetcher.x*8, ly, row);
 }
 
-void gbe::ppu_t::push_window_fifo(){
-	if(ly >= wl || background_fifo.x*8 < wx-7)
-		return;
-	window_has_drawn_pixel = true;
-	byte row[PIXELS_IN_FIFO]{0};
-	get_fifo_pixel_data(row, background_fifo);
-	display.draw_row_8(background_fifo.x*8, ly, row);
+void gbe::ppu_t::update_sprite_fifo(){
+	//	see if there's a sprite and if so draw all of its non-transparent colours
+	for(int i = 0; i < sprite_buffer_size; ++i){
+		if((sprite_buffer[i].x - pixel_fetcher.x*8)/8 == 0){
+			oam_memory_t& cur_sprite = sprite_buffer[i];
+			int shift = pixel_fetcher.x*8 - cur_sprite.x;
+			byte sprite_size = lcd_control&BIT(2) ? 16 : 8;
+			int y = cur_sprite.flags&BIT(6) ? (sprite_size-1)-((ly-cur_sprite.y)%sprite_size) : ((ly-cur_sprite.y)%sprite_size);
+			pixel_fetcher.cur_tile = get_sprite_fifo_tile(cur_sprite.tile, y, cur_sprite.flags&BIT(5), lcd_control&BIT(2));
+			byte palette = cur_sprite.flags&BIT(4) ? obp1 : obp0;
+			set_fifo_pixels_with_tile_data(sprite_fifo, palette, cur_sprite.flags&BIT(7), shift);
+			for(int j = 0; j < 8; ++j){
+				if(sprite_fifo.pixels[j].colour != 0b00){
+					if(sprite_fifo.pixels[j].backround_priority == 0){
+						background_fifo.pixels[j] = sprite_fifo.pixels[j];
+					} else{
+						if(background_fifo.pixels[j].colour == 0b00)
+							background_fifo.pixels[j] = sprite_fifo.pixels[j];
+					}
+				}
+			}
+			byte row[PIXELS_IN_FIFO];
+			get_fifo_pixel_data(row, background_fifo);
+			display.draw_row_8(pixel_fetcher.x*8, ly, row);
+		}
+	}
 }
 
 void gbe::ppu_t::update(){
 	if(lcd_control&BIT(7) == 0)
 		return;
-	if(dots == 80-1){
+	if(dots < 80){
+		on_oam();
+	} else if(dots == 80){
+		order_array(sprite_buffer, sprite_buffer_size);
 		change_ppu_mode(MODE_3);
 		on_oam_end();
-	} else if(dots >= 80 && background_fifo.x < 20){
+	} else if(dots > 80 && pixel_fetcher.x < 20){
 		on_draw();
 	} else if(dots == 80+168){
 		change_ppu_mode(MODE_0);
@@ -159,6 +199,20 @@ void gbe::ppu_t::update(){
 		on_new_scanline();
 	} else
 		++dots;
+}
+
+void gbe::ppu_t::on_oam(){
+	if(dots%2 == 1)
+		return;
+	byte sprite_height = lcd_control&BIT(2) ? 16 : 8;
+	if(sprite_buffer_size < MAX_SPRITES_ON_SCANLINE){
+		oam_memory_t cur = *reinterpret_cast<oam_memory_t*>(&memory.mem[OAM_START_ADDRESS+(dots/2)*4]);
+		cur.y-=16;
+		cur.x-=8;;
+		if(cur.y <= ly && cur.y+sprite_height > ly && cur.x >= 0 && cur.x < 160 && cur.y >= 0 && cur.y < 144){
+			sprite_buffer[sprite_buffer_size++] = cur;
+		}
+	}
 }
 
 void gbe::ppu_t::on_oam_end(){
@@ -174,30 +228,25 @@ void gbe::ppu_t::on_oam_end(){
 
 void gbe::ppu_t::on_draw(){
 	if(lcd_control&BIT(0)){
-		if(lcd_control&BIT(5)){
-			if(bg_drawing)
-				update_bg();
-			else
-				update_wn();
-		}
-		else 
-			update_bg();
+		update_bg_and_wn();
 	}
 }
 
 void gbe::ppu_t::on_draw_end(){
-
+	//lcd_status|=BIT(3);
+	//stat_interrupt();
 }
 
 void gbe::ppu_t::on_new_scanline(){		
-	++ly;
 	if(window_has_drawn_pixel){
 		++wl;
 		window_has_drawn_pixel = false;
 	}
 	dots = 0;
-	background_fifo.x = 0;
+	pixel_fetcher.x = 0;
 	lcd_interrupt_fired = false;
+	sprite_buffer_size = 0;
+	++ly;
 	if(ly == 144)
 		v_blank();
 	if(ly == MAX_SCANLINES)
@@ -217,8 +266,9 @@ void gbe::ppu_t::stat_interrupt(){
 }
 
 void gbe::ppu_t::v_blank(){
-	std::this_thread::sleep_for(std::chrono::milliseconds(10));
+	//std::this_thread::sleep_for(std::chrono::milliseconds(10));
 	change_ppu_mode(MODE_1);
+	SDL_PumpEvents();	//	input
 	display.render_buffer();
 	memory.request_interrupt((byte)interrupt_bits::V_BLANK);
 }
@@ -226,6 +276,7 @@ void gbe::ppu_t::v_blank(){
 void gbe::ppu_t::reset(){
 	wl = 0;
 	ly = 0;
+	lcd_status = 0;
 	change_ppu_mode(MODE_2);
 	reset_fifos();
 }
@@ -235,8 +286,8 @@ void gbe::ppu_t::reset_fifos(){
 	sprite_fifo = fifo();
 }
 
-void gbe::ppu_t::update_bg(){
-	switch(background_fifo.cur_step)
+void gbe::ppu_t::update_bg_and_wn(){
+	switch(pixel_fetcher.cur_step)
 	{
 	case 0:
 		get_background_tile();
@@ -246,34 +297,14 @@ void gbe::ppu_t::update_bg(){
 	case 2:
 		break;
 	case 3:
-		push_background_fifo();
+		if(lcd_control&BIT(0))
+			push_background_fifo();
+		if(lcd_control&BIT(1))
+			update_sprite_fifo();
 		break;
 	case 4:
-		if(lcd_control&BIT(5))
-			bg_drawing = !bg_drawing;
-		else 
-			++background_fifo.x;
+		++pixel_fetcher.x;
 		break;
 	}
-	background_fifo.inc_step();
-}
-void gbe::ppu_t::update_wn(){
-	switch(background_fifo.cur_step)
-	{
-	case 0:
-		get_window_tile();
-		break;
-	case 1:
-		break;
-	case 2:
-		break;
-	case 3:
-		push_window_fifo();
-		break;
-	case 4:
-		bg_drawing = !bg_drawing;
-		++background_fifo.x;
-		break;
-	}
-	background_fifo.inc_step();
+	pixel_fetcher.inc_step();
 }

@@ -1,7 +1,8 @@
 #pragma once
 #include<gbe/mem/mem.h>
 #include<gbe/ppu/display.h>
-#define PIXELS_IN_FIFO 16
+#define PIXELS_IN_FIFO 8
+#define SPRITES_IN_OAM 40
 
 namespace gbe{
 	/*
@@ -34,8 +35,6 @@ namespace gbe{
 	};
 
 	struct tile{
-		word tile_index{0};
-		word vram_address{0};
 		union{
 			word tile_data{0};
 			struct{
@@ -45,13 +44,22 @@ namespace gbe{
 		};
 	};
 
-	struct fifo{
+	struct fetcher{
 		byte cur_step{0};
 		byte x = 0;
 		tile cur_tile{0};
-		fifo_pixel pixels[PIXELS_IN_FIFO];
 		void inc_step(){
 			cur_step = (cur_step+1)%5;
+		}
+		void flush(){
+			cur_tile.tile_data = 0;
+		}
+	};
+
+	struct fifo{
+		fifo_pixel pixels[PIXELS_IN_FIFO];
+		void flush(){
+			memset(pixels, 0, sizeof(pixels));
 		}
 	};
 
@@ -62,13 +70,14 @@ namespace gbe{
 		}
 		void update();
 	protected:
+		void set_fifo_pixels_with_tile_data(gbe::fifo& f, byte palette, byte priority, int shift);
+		void set_bg_fifo_tile(fifo& f, byte x, byte y, byte palette, bool mode_9C00, bool mode_8000);
+		tile get_sprite_fifo_tile(byte tile_index, byte y, bool x_flip, bool is_16_height);
+		tile get_bg_fifo_tile(byte x, byte y, byte palette, bool mode_9C00, bool mode_8000);
 		void get_background_tile();
-		void get_window_tile();
-		void set_fifo_pixels_with_tile_data(gbe::fifo& f, byte palette);
 		void push_background_fifo();
-		void push_window_fifo();
-		void update_bg();
-		void update_wn();
+		void update_sprite_fifo();
+		void update_bg_and_wn();
 		void v_blank();
 		void stat_interrupt();
 		void reset();
@@ -86,16 +95,17 @@ namespace gbe{
 		void on_oam_end();
 		void on_new_scanline();
 		void on_draw_end();
+		void on_oam();
 		void on_draw();
 		fifo background_fifo;
 		fifo sprite_fifo;
+		fetcher pixel_fetcher;
 		mem_t& memory;
 		display_t display; 
 		oam_memory_t sprite_buffer[10];
 		int sprite_buffer_size{0};
 		int dots{0};
 		int wl{0};
-		bool bg_drawing = true;
 		bool lcd_interrupt_fired = false;
 		bool window_has_drawn_pixel = false;
 		//typedef std::chrono::duration<unsigned long long int, std::ratio<238, 1000000000>> gb_cycle_time;
