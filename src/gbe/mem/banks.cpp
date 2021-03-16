@@ -78,10 +78,10 @@ void gbe::memory_bank_controller_t::write_mem(const word& adr, byte val){
 	determine_bank_swap(adr, val);
 	if(determine_if_rom_address(adr))
 		return;
-	else if(determine_if_ram_address(adr))
+	else if(determine_if_ram_address(adr)){
 		if(this->ram_writing_enabled)
 			this->active_switchable_ram_bank->write_to(adr, val);
-	else
+	} else 
 		throw gbe_error::READ_OR_WRITE_TO_INVALID_ADDRESS;
 }
 byte gbe::memory_bank_controller_t::read_mem(const word& adr){
@@ -89,8 +89,7 @@ byte gbe::memory_bank_controller_t::read_mem(const word& adr){
 		return select_rom_bank_from_address(adr).read_from(adr);
 	else if(determine_if_ram_address(adr))
 		return this->active_switchable_ram_bank->read_from(adr);
-	else
-		throw gbe_error::READ_OR_WRITE_TO_INVALID_ADDRESS;
+	throw gbe_error::READ_OR_WRITE_TO_INVALID_ADDRESS;
 }
 
 //	MBC NONE
@@ -143,9 +142,7 @@ void gbe::memory_bank_controller_mbc1_t::determine_bank_swap(const word& adr, by
 			new_bank = 0x41;
 		else if(new_bank == 0x60)
 			new_bank = 0x61;
-		if(new_bank > this->switchable_rom_banks_size)
-			throw gbe_error::SWAPED_TO_NONEXISTANT_BANK;
-		this->swap_rom_bank(new_bank-1);
+		this->swap_rom_bank((new_bank%(this->switchable_rom_banks_size+1))-1);
 	}
 	else if(adr >= 0x4000 && adr <= 0x5FFF){	//	RAM swap
 		if(this->rom_ram_mode == ROM_BANKING_MODE){

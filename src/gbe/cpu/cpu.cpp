@@ -38,6 +38,7 @@ void gbe::cpu_t::emulate_fetch_decode_execute_cycle(){
 	this->ppu.update();
 	if(++cur_cycles < cur_instruction_cycles)
 		return;
+
 	check_interrupt_status();
 	check_joypad_input();
 	byte instr_index = this->memory.read_byte_from_memory(this->regs.pc);
@@ -76,8 +77,14 @@ void gbe::cpu_t::check_interrupt_status(){
 	//	in the flag.
 	int reg_flag = this->memory.get_interrupt_flag();
 	int reg_enable = this->memory.get_interrupt_enable();
-	if(this->memory.get_ime() && (reg_flag & reg_enable & 0b0001'1111)){
+	if(this->memory.get_ime() && reg_flag & reg_enable & 0x1F){
 		instructions.b16_push(regs.pc);
+		if(reg_enable != this->memory.get_interrupt_enable()){
+			reg_enable = this->memory.get_interrupt_enable();
+			this->memory.disable_ime();
+			this->regs.pc = 0x0000;
+		}
+		this->cycles.increment_cycles_t(20);
 		if(reg_flag & reg_enable & BIT(0)){			//	V-Blank; INT 40
 			regs.pc = 0x40;
 			memory.set_interrupt_flag(reg_flag^BIT(0));
@@ -115,14 +122,14 @@ void gbe::cpu_t::check_joypad_input(){
 	buttons 	|= (keyboard[SDL_SCANCODE_K] == 0) << 2;
 	buttons		|= (keyboard[SDL_SCANCODE_L] == 0) << 3;
 	byte low_bits = 0x0F;
-	if(input_register&BIT(4)) 
-		low_bits &= directions;
 	if(input_register&BIT(5)) 
+		low_bits &= directions;
+	if(input_register&BIT(4)) 
 		low_bits &= buttons;
-	if(~low_bits){
+	if((~low_bits & 0x0F)){
 		memory.request_interrupt((byte)interrupt_bits::Joypad);
 	}
-	input_register = (input_register&0xF0) + low_bits;
+	input_register = (input_register&0xF0) | low_bits;
 	memory.write_byte_to_memory((word)reserved_memory_locations_enum::JOYPAD_REG, input_register);
 }
 
@@ -276,6 +283,7 @@ gbe::cpu_t::instruction_t gbe::cpu_t::cpu_instructions[]{	//	returns if pc shoul
 	{"JR NZ, i8", 2, 8, INSTR{
 		if(INSTRUCTION.jr_cc(LOAD_IMMEDIATE_BYTE, !R_F.bits.z) == branching_t::DO_BRANCH){
 			cpu.cycles.increment_cycles_m(1);
+			//return false;
 		}
 		return true;
 	}},
@@ -310,6 +318,7 @@ gbe::cpu_t::instruction_t gbe::cpu_t::cpu_instructions[]{	//	returns if pc shoul
 	{"JR Z, i8", 2, 8, INSTR{
 		if(INSTRUCTION.jr_cc(LOAD_IMMEDIATE_BYTE, R_F.bits.z) == branching_t::DO_BRANCH){
 			cpu.cycles.increment_cycles_m(1);
+			//return false;
 		}
 		return true;
 	}},
@@ -344,6 +353,7 @@ gbe::cpu_t::instruction_t gbe::cpu_t::cpu_instructions[]{	//	returns if pc shoul
 	{"JR NC, i8", 2, 8, INSTR{
 		if(INSTRUCTION.jr_cc(LOAD_IMMEDIATE_BYTE, !R_F.bits.c) == branching_t::DO_BRANCH){
 			cpu.cycles.increment_cycles_m(1);
+			//return false;
 		}
 		return true;
 	}},
@@ -378,6 +388,7 @@ gbe::cpu_t::instruction_t gbe::cpu_t::cpu_instructions[]{	//	returns if pc shoul
 	{"JR C, i8", 2, 8, INSTR{
 		if(INSTRUCTION.jr_cc(LOAD_IMMEDIATE_BYTE, R_F.bits.c) == branching_t::DO_BRANCH){
 			cpu.cycles.increment_cycles_m(1);
+			//return false;
 		}
 		return true;
 	}},

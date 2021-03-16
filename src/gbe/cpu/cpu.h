@@ -77,7 +77,9 @@ namespace gbe{
 			stream_test << hex(memory.read_byte_from_memory(regs.pc+2));
 			stream_test << " ";
 			stream_test << hex(memory.read_byte_from_memory(regs.pc+3));
-			stream_test << ")\n";
+			stream_test << ")";
+			stream_test << " " << cpu_instructions[memory.read_byte_from_memory(regs.pc)].mnemonic;
+			stream_test << "\n";
 		}
 		void output_print_to_file(){
 			output_stream_test << stream_test.rdbuf();

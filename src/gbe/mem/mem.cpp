@@ -50,6 +50,7 @@ void gbe::mem_t::write_to_internal_memory(const word& adr, byte value){
 				write_to_internal_memory(OAM_MEMORY_BUFFER_START_ADDRESS+i,
 					read_byte_from_memory((value<<8)+i));
 			}
+			mem[adr] = value;
 		}
 		else if(adr == (word)reserved_memory_locations_enum::CGB_MODE_ONLY);	//	do nothing here
 		else
@@ -79,19 +80,14 @@ byte gbe::mem_t::read_byte_from_memory(word adr){
 	return read_byte_from_internal_memory(adr);
 }
 void gbe::mem_t::write_word_to_memory(word adr, word value){
-	if(determine_if_bank_address(adr))
-		mem_bank_controller.write_word(adr, value);
-	else{
-		write_to_internal_memory(adr, value);
-		write_to_internal_memory(adr+1, value >> 8);
-	}
+	write_byte_to_memory(adr, value);
+	write_byte_to_memory(adr+1, value >> 8);
 }
 word gbe::mem_t::read_word_from_memory(word adr){
-	if(adr < sizeof(mem_t::boot_rom) && is_boot_rom_mounted)
-		return (word&)boot_rom[adr];
-	if(determine_if_bank_address(adr))
-		return mem_bank_controller.read_word(adr);
-	return read_word_from_internal_memory(adr);
+	word rtrn;
+	rtrn |= read_byte_from_memory(adr);
+	rtrn |= read_byte_from_memory(adr+1) << 8;
+	return rtrn;
 }
 
 void gbe::mem_t::increment_timer(unsigned long long int& cycles){
