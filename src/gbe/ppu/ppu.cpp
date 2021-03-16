@@ -268,7 +268,7 @@ void gbe::ppu_t::stat_interrupt(){
 void gbe::ppu_t::v_blank(){
 	//std::this_thread::sleep_for(std::chrono::milliseconds(10));
 	change_ppu_mode(MODE_1);
-	SDL_PumpEvents();	//	input
+	SDL_PollEvent(NULL);	//	input
 	display.render_buffer();
 	memory.request_interrupt((byte)interrupt_bits::V_BLANK);
 }

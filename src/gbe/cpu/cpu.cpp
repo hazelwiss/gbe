@@ -63,7 +63,6 @@ void gbe::cpu_t::emulate_fetch_decode_execute_cycle(){
 		this->regs.pc += instr.byte_length;
 	diff = this->cycles.t_cycles - diff;
 	int passed_cycles = instr.t_cycles+diff;
-	check_dma_status(diff);
 	this->cycles.increment_cycles_t(passed_cycles);
 	this->memory.increment_timer(this->cycles.t_cycles);
 	cur_cycles = 0;

@@ -5,7 +5,7 @@
 #define ROM_BANKING_MODE 0x00
 
 namespace gbe{
-	template<int size>
+	template<typename data, int size>
 	struct bank_t{
 		inline void write_to(const word adr, byte value){
 			word n_adr = adr%size;
@@ -19,8 +19,8 @@ namespace gbe{
 		//	Adding more members might mess up some code where I use sizeof()
 		byte mem[size]{};
 	};
-	struct rom_bank_t: bank_t<16_kb>{};
-	struct ram_bank_t: bank_t<8_kb>{};
+	struct rom_bank_t: bank_t<const byte, 16_kb>{};
+	struct ram_bank_t: bank_t<byte, 8_kb>{};
 	//	abstract class for runtime polymorphism
 	struct memory_bank_controller_t{
 		inline memory_bank_controller_t(int& switchable_rom_banks, int& switchable_ram_banks):

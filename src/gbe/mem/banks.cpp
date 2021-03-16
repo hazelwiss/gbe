@@ -1,4 +1,5 @@
 #include"banks.h"
+#include<iostream>
 
 void gbe::memory_bank_controller_t::copy_rom(const byte* rom_data, int rom_size){
 	this->determine_bank_size();

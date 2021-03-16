@@ -90,9 +90,6 @@ namespace gbe{
 		}
 	protected:
 		void check_interrupt_status();
-		void check_dma_status(int cycles_passed_since_last_execution){
-			memory.dma_transfer(cycles_passed_since_last_execution);
-		}
 		void check_joypad_input();
 		struct{
 			union{

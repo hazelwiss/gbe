@@ -7,7 +7,7 @@ int main(){
 	gbe::cpu_t cpu;
 	cpu.create_window();
 	try{
-		cpu.load_ROM("roms/Tetris.gb");
+		cpu.load_ROM("roms/testing/rom_512kb.gb");
 	}
 	catch(gbe::gbe_error e){
 		printf("Error reading from file! %d\n", e);
@@ -18,6 +18,7 @@ int main(){
 		}
 		catch(gbe::gbe_error e){
 			printf("Error during the fetch, decode and execute cycle! %d\n", e);
+			//cpu.output_print_to_file();
 			break;
 		}		
 	return 0;
