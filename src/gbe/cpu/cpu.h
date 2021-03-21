@@ -123,6 +123,8 @@ namespace gbe{
 		} cycles;
 		int cur_cycles{0};
 		int cur_instruction_cycles{0};
+		bool halted = false;
+		bool stopped = false;
 		const byte* keyboard;
 		mem_t memory;
 		ppu_t ppu{memory};

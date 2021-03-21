@@ -130,7 +130,7 @@ void gbe::general_instructions_t::b8_inc_adr(word adr){
 	set_n_flag(false);
 	set_h_flag((val & 0x0F) == 0x0F);
 	mem.write_word_to_memory(adr, val+1);
-	set_z_flag(!(byte)(val+1));
+	set_z_flag(!(val+1));
 }
 void gbe::general_instructions_t::b8_dec(byte& reg){
 	set_n_flag(true);
@@ -142,7 +142,7 @@ void gbe::general_instructions_t::b8_dec_adr(word adr){
 	set_n_flag(true);
 	set_h_flag((val&0x0F) < 1);
 	mem.write_word_to_memory(adr, val-1);
-	set_z_flag(!(byte)(val-1));
+	set_z_flag(!(val-1));
 }
 
 //	16-Bit-Arithmetic
@@ -202,7 +202,7 @@ void gbe::general_instructions_t::misc_cpl(){
 void gbe::general_instructions_t::misc_ccf(){
 	set_n_flag(false);
 	set_h_flag(false);
-	this->cpu.regs.f.bits.c = !this->cpu.regs.f.bits.c;	//	sets the flag in of itself
+	this->cpu.regs.f.bits.c = 0;	//	sets the flag in of itself
 }
 void gbe::general_instructions_t::misc_scf(){
 	set_n_flag(false);
@@ -212,21 +212,11 @@ void gbe::general_instructions_t::misc_scf(){
 void gbe::general_instructions_t::misc_nop(){
 	return;
 }
-gbe::branching_t gbe::general_instructions_t::misc_halt(){
-	if(cpu.memory.get_interrupt_flag() & cpu.memory.get_interrupt_enable()){
-		if(!cpu.memory.get_ime() && !halted){
-			auto instr = cpu.cpu_instructions[cpu.memory.read_byte_from_memory(cpu.regs.pc+1)];
-			cpu.regs.pc += instr.byte_length;
-			cpu.cycles.increment_cycles_t(instr.t_cycles);
-		}
-		halted = false;
-		return branching_t::DO_BRANCH;
-	}
-	halted = true;
-	return branching_t::DO_NOT_BRANCH;
+void gbe::general_instructions_t::misc_halt(){
+	cpu.halted = true;
 }
-gbe::branching_t gbe::general_instructions_t::misc_stop(){
-	return branching_t::DO_BRANCH;
+void gbe::general_instructions_t::misc_stop(){
+	cpu.stopped = true;
 }
 void gbe::general_instructions_t::misc_di(){
 	this->cpu.request_e_interrupt = false;
@@ -326,10 +316,10 @@ void gbe::general_instructions_t::b1_bit(byte& reg, byte bit){
 	set_z_flag(!((reg >> bit) & 0x01));
 }
 void gbe::general_instructions_t::b1_set(byte& reg, byte bit){
-	reg |= (0x01 << bit);
+	reg |= BIT(bit);
 }
 void gbe::general_instructions_t::b1_res(byte& reg, byte bit){
-	reg ^= ((0x01 << bit) & reg);
+	reg &= ~BIT(bit);
 }
 
 //	Jumps

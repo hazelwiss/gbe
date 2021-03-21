@@ -34,10 +34,18 @@ void gbe::cpu_t::print_rom_info(){
 	printf("ram size: %d\n", this->memory.get_rom_info().ram_size);
 }
 
+int x = 0;
+
 void gbe::cpu_t::emulate_fetch_decode_execute_cycle(){
 	this->ppu.update();
+	this->memory.increment_timer(stopped);
 	if(++cur_cycles < cur_instruction_cycles)
 		return;
+
+
+	if(!this->memory.get_boot_rom_mount_status()){
+		print_regs();
+	}
 
 	check_interrupt_status();
 	check_joypad_input();
@@ -65,9 +73,14 @@ void gbe::cpu_t::emulate_fetch_decode_execute_cycle(){
 	diff = this->cycles.t_cycles - diff;
 	int passed_cycles = instr.t_cycles+diff;
 	this->cycles.increment_cycles_t(passed_cycles);
-	this->memory.increment_timer(this->cycles.t_cycles);
 	cur_cycles = 0;
+
 	cur_instruction_cycles = passed_cycles;
+	//printf("%s\n", instr.mnemonic);
+	if(this->memory.get_boot_rom_mount_status() == 0){
+		++x;
+	}
+
 }
 
 void gbe::cpu_t::check_interrupt_status(){
@@ -77,35 +90,45 @@ void gbe::cpu_t::check_interrupt_status(){
 	//	in the flag.
 	int reg_flag = this->memory.get_interrupt_flag();
 	int reg_enable = this->memory.get_interrupt_enable();
-	if(this->memory.get_ime() && reg_flag & reg_enable & 0x1F){
-		instructions.b16_push(regs.pc);
-		if(reg_enable != this->memory.get_interrupt_enable()){
-			reg_enable = this->memory.get_interrupt_enable();
-			this->memory.disable_ime();
-			this->regs.pc = 0x0000;
+	if(reg_flag & reg_enable & 0x1F){
+		if(halted){
+			halted = false;
+			this->regs.pc += 1;
+			cycles.increment_cycles_t(4);
 		}
-		this->cycles.increment_cycles_t(20);
-		if(reg_flag & reg_enable & BIT(0)){			//	V-Blank; INT 40
-			regs.pc = 0x40;
-			memory.set_interrupt_flag(reg_flag^BIT(0));
+		if(this->memory.get_ime()){
+			if(stopped && reg_enable & reg_flag & BIT(4)){
+				regs.pc +=2;
+			}
+			instructions.b16_push(regs.pc);
+			if(reg_enable != this->memory.get_interrupt_enable()){
+				reg_enable = this->memory.get_interrupt_enable();
+				this->memory.disable_ime();
+				this->regs.pc = 0x0000;
+			}
+			this->cycles.increment_cycles_t(20);
+			if(reg_flag & reg_enable & BIT(0)){			//	V-Blank; INT 40
+				regs.pc = 0x40;
+				memory.set_interrupt_flag(reg_flag^BIT(0));
+			}
+			else if(reg_flag & reg_enable & BIT(1)){	//	LCD STAT; INT 48;
+				regs.pc = 0x48;
+				memory.set_interrupt_flag(reg_flag^BIT(1));
+			}
+			else if(reg_flag & reg_enable & BIT(2)){	//	Timer; INT 50
+				regs.pc = 0x50;
+				memory.set_interrupt_flag(reg_flag^BIT(2));
+			}
+			else if(reg_flag & reg_enable & BIT(3)){	//	Serial; INT 58
+				regs.pc = 0x58;
+				memory.set_interrupt_flag(reg_flag^BIT(3));
+			}
+			else if(reg_flag & reg_enable & BIT(4)){	//	Joypad; INT 60
+				regs.pc = 0x60;
+				memory.set_interrupt_flag(reg_flag^BIT(4));
+			}
+			memory.disable_ime();
 		}
-		else if(reg_flag & reg_enable & BIT(1)){	//	LCD STAT; INT 48;
-			regs.pc = 0x48;
-			memory.set_interrupt_flag(reg_flag^BIT(1));
-		}
-		else if(reg_flag & reg_enable & BIT(2)){	//	Timer; INT 50
-			regs.pc = 0x50;
-			memory.set_interrupt_flag(reg_flag^BIT(2));
-		}
-		else if(reg_flag & reg_enable & BIT(3)){	//	Serial; INT 58
-			regs.pc = 0x58;
-			memory.set_interrupt_flag(reg_flag^BIT(3));
-		}
-		else if(reg_flag & reg_enable & BIT(4)){	//	Joypad; INT 60
-			regs.pc = 0x60;
-			memory.set_interrupt_flag(reg_flag^BIT(4));
-		}
-		memory.disable_ime();
 	}
 }
 
@@ -216,9 +239,8 @@ gbe::cpu_t::instruction_t gbe::cpu_t::cpu_instructions[]{	//	returns if pc shoul
 		return true;
 	}},
 	{"STOP", 2, 4, INSTR{
-		if(INSTRUCTION.misc_stop() == branching_t::DO_BRANCH)
-			return true;
-		return false;	//	returns false and waits for button press
+		INSTRUCTION.misc_stop();
+		return false;
 	}},
 	{"LD DE, u16", 3, 12, INSTR{
 		INSTRUCTION.b16_load_reg_val(R_DE, LOAD_IMMEDIATE_WORD);
@@ -283,7 +305,6 @@ gbe::cpu_t::instruction_t gbe::cpu_t::cpu_instructions[]{	//	returns if pc shoul
 	{"JR NZ, i8", 2, 8, INSTR{
 		if(INSTRUCTION.jr_cc(LOAD_IMMEDIATE_BYTE, !R_F.bits.z) == branching_t::DO_BRANCH){
 			cpu.cycles.increment_cycles_m(1);
-			//return false;
 		}
 		return true;
 	}},
@@ -318,7 +339,6 @@ gbe::cpu_t::instruction_t gbe::cpu_t::cpu_instructions[]{	//	returns if pc shoul
 	{"JR Z, i8", 2, 8, INSTR{
 		if(INSTRUCTION.jr_cc(LOAD_IMMEDIATE_BYTE, R_F.bits.z) == branching_t::DO_BRANCH){
 			cpu.cycles.increment_cycles_m(1);
-			//return false;
 		}
 		return true;
 	}},
@@ -353,7 +373,6 @@ gbe::cpu_t::instruction_t gbe::cpu_t::cpu_instructions[]{	//	returns if pc shoul
 	{"JR NC, i8", 2, 8, INSTR{
 		if(INSTRUCTION.jr_cc(LOAD_IMMEDIATE_BYTE, !R_F.bits.c) == branching_t::DO_BRANCH){
 			cpu.cycles.increment_cycles_m(1);
-			//return false;
 		}
 		return true;
 	}},
@@ -637,9 +656,8 @@ gbe::cpu_t::instruction_t gbe::cpu_t::cpu_instructions[]{	//	returns if pc shoul
 		return true;
 	}},
 	{"HALT", 1, 4, INSTR{
-		if(INSTRUCTION.misc_halt() == branching_t::DO_BRANCH)
-			return true;
-		return false;	//	halts until any interrupt
+		INSTRUCTION.misc_halt();
+		return false;
 	}},
 	{"LD (HL), A", 1, 8, INSTR{
 		INSTRUCTION.b8_load_adr_reg(R_HL, R_A);
@@ -1141,7 +1159,7 @@ gbe::cpu_t::instruction_t gbe::cpu_t::cpu_instructions[]{	//	returns if pc shoul
 		}
 		return true;
 	}},
-	{"RETI", 1, 16, INSTR{
+	{"RETI", 1, 12, INSTR{
 		INSTRUCTION.reti();
 		return false;
 	}},
@@ -1169,7 +1187,7 @@ gbe::cpu_t::instruction_t gbe::cpu_t::cpu_instructions[]{	//	returns if pc shoul
 		INSTRUCTION.b8_sbc(LOAD_IMMEDIATE_BYTE);
 		return true;
 	}},
-	{"RST 18h", 1, 4, INSTR{
+	{"RST 18h", 1, 16, INSTR{
 		INSTRUCTION.rst(0x18);
 		return false;
 	}},
@@ -1177,7 +1195,7 @@ gbe::cpu_t::instruction_t gbe::cpu_t::cpu_instructions[]{	//	returns if pc shoul
 		INSTRUCTION.b8_load_adr_reg(0xFF00+LOAD_IMMEDIATE_BYTE, R_A);
 		return true;
 	}},
-	{"POP HL", 1, 4, INSTR{
+	{"POP HL", 1, 12, INSTR{
 		INSTRUCTION.b16_pop(R_HL);
 		return true;
 	}},

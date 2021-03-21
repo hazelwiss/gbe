@@ -192,7 +192,6 @@ void gbe::ppu_t::update(){
 	} else if(dots > 80 && pixel_fetcher.x < 20){
 		on_draw();
 	} else if(dots == 80+168){
-		change_ppu_mode(MODE_0);
 		on_draw_end();
 	} 
 	if(dots+1 >= DOTS_PER_SCANLINE){
@@ -217,13 +216,12 @@ void gbe::ppu_t::on_oam(){
 
 void gbe::ppu_t::on_oam_end(){
 	if(ly == lcy){
-		lcd_status|=BIT(6);
+		if(lcd_status&BIT(6))
+			stat_interrupt();
 		lcd_status|=BIT(2);
 	} else{
-		lcd_status&=~BIT(6);
 		lcd_status&=~BIT(2);
 	}
-	stat_interrupt();
 }
 
 void gbe::ppu_t::on_draw(){
@@ -233,8 +231,9 @@ void gbe::ppu_t::on_draw(){
 }
 
 void gbe::ppu_t::on_draw_end(){
-	//lcd_status|=BIT(3);
-	//stat_interrupt();
+	if(lcd_status&BIT(3))
+		stat_interrupt();
+	change_ppu_mode(MODE_0);
 }
 
 void gbe::ppu_t::on_new_scanline(){		
@@ -254,19 +253,13 @@ void gbe::ppu_t::on_new_scanline(){
 }
 
 void gbe::ppu_t::stat_interrupt(){
-	int mode = lcd_status&0b11;
-	bool should_interrupt = !lcd_interrupt_fired &&(
-		lcd_status&BIT(3)	||
-		lcd_status&BIT(4)	||
-		lcd_status&BIT(5)	||
-		lcd_status&BIT(6));
-	if(should_interrupt){
-		fire_lcd_interrupt();
-	}
+	fire_lcd_interrupt();
 }
 
 void gbe::ppu_t::v_blank(){
 	//std::this_thread::sleep_for(std::chrono::milliseconds(10));
+	if(lcd_status&BIT(4))
+		stat_interrupt();
 	change_ppu_mode(MODE_1);
 	SDL_PollEvent(NULL);	//	input
 	display.render_buffer();
@@ -276,7 +269,8 @@ void gbe::ppu_t::v_blank(){
 void gbe::ppu_t::reset(){
 	wl = 0;
 	ly = 0;
-	lcd_status = 0;
+	if(lcd_status&BIT(5))
+		stat_interrupt();
 	change_ppu_mode(MODE_2);
 	reset_fifos();
 }

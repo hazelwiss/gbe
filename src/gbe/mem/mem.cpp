@@ -34,29 +34,23 @@ void gbe::mem_t::write_to_internal_memory(const word& adr, byte value){
 	if(adr >= 0xE000 && adr <= 0xFDFF){			//	echoes ram writen to this address to the address 2000 steps lower
 		mem[adr-0x2000] = value;
 		mem[adr] = value;
-	}
-	else if(adr >= 0xC000 && adr <= 0xDDFF){	//	echoes ram writen to this address to the address 2000 steps above
+	} else if(adr >= 0xC000 && adr <= 0xDDFF){	//	echoes ram writen to this address to the address 2000 steps above
 		mem[adr+0x2000] = value;
 		mem[adr] = value;
-	}
-	else if(adr >= 0xFF00 && adr <= 0xFF7F){	//	I/O registers
-		if(adr == (word)reserved_memory_locations_enum::DIVIDER_REGISTER)
+	} else if(adr >= 0xFF00 && adr <= 0xFF7F){	//	I/O registers
+		if(adr == (word)reserved_memory_locations_enum::DIVIDER_REGISTER){
 			divider_reg = 0;	//	resets the divider reigster to zero whenever a value is written to it
-		else if(adr == (word)reserved_memory_locations_enum::LCD_STATUS_REGISTER && //	only triggered during OAM scan, v/h-blank or LY=LYC
-			(lcd_status_register & 0b0000'0011) != 3){	
 		}
-		else if(adr == (word)reserved_memory_locations_enum::DMA_TRANSFER){
+		if(adr == (word)reserved_memory_locations_enum::DMA_TRANSFER){
 			for(int i = 0; i < OAM_MEMORY_BUFFER_SIZE; ++i){
 				write_to_internal_memory(OAM_MEMORY_BUFFER_START_ADDRESS+i,
 					read_byte_from_memory((value<<8)+i));
 			}
 			mem[adr] = value;
-		}
-		else if(adr == (word)reserved_memory_locations_enum::CGB_MODE_ONLY);	//	do nothing here
+		} else if(adr == (word)reserved_memory_locations_enum::CGB_MODE_ONLY);	//	do nothing here
 		else
 			mem[adr] = value;
-	}
-	else
+	} else
 		mem[adr] = value;
 }
 
@@ -67,6 +61,8 @@ byte gbe::mem_t::read_byte_from_internal_memory(word adr){
 }
 
 void gbe::mem_t::write_byte_to_memory(word adr, byte value){
+	if(adr == 0xDFE0 && value == 0x67)
+		int z = 0;
 	if(determine_if_bank_address(adr))
 		mem_bank_controller.write_byte(adr, value);
 	else 
@@ -90,43 +86,37 @@ word gbe::mem_t::read_word_from_memory(word adr){
 	return rtrn;
 }
 
-void gbe::mem_t::increment_timer(unsigned long long int& cycles){
-	byte divider_register_cmp_val = cycles % 256;
-	if(!divider_register_cmp_val || divider_register_cmp_val < this->increment_divider_tmp_value)
-		++this->divider_reg;
-	this->increment_divider_tmp_value = divider_register_cmp_val;
-	if(this->timer_control & BIT(2)){
-		byte timer_counter_cmp_val;
-		switch(this->timer_control & 0xb0000-0011){
+void gbe::mem_t::increment_timer(bool stop){
+	auto& tmp_div 	= increment_divider_tmp_value;
+	auto& tmp_tima 	= increment_timer_tmp_value;
+	if(timer_control&BIT(2)){
+		word inc = 0;
+		++tmp_tima;
+		switch(timer_control&0b11)
+		{
 		case 0b00:
-			timer_counter_cmp_val = cycles%(cpu_freq/1024);
+			inc = (tmp_tima%1024) == 0;
 			break;
 		case 0b01:
-			timer_counter_cmp_val = cycles%(cpu_freq/16);
+			inc = (tmp_tima%16) == 0;
 			break;
 		case 0b10:
-			timer_counter_cmp_val = cycles%(cpu_freq/64);
+			inc = (tmp_tima%64) == 0;
 			break;
 		case 0b11:
-			timer_counter_cmp_val = cycles%(cpu_freq/256);
+			inc = (tmp_tima%256) == 0;
 			break;
 		}
-		if(!timer_counter_cmp_val || timer_counter_cmp_val < this->increment_timer_tmp_value){
-			if(this->timer_counter == 0xFF){
-				this->timer_counter = this->timer_modulo;
-				timer_overflow = true;
-			}
-			else if(timer_overflow && this->timer_counter == this->timer_modulo){
-				timer_overflow = false;
-				this->request_interrupt((byte)interrupt_bits::TIMER);
-				++this->timer_counter;
-			}
-			else 
-				++this->timer_counter;
-		}
-		this->increment_timer_tmp_value = timer_counter_cmp_val;
+		byte cmp = timer_counter+inc;
+		if(cmp < timer_counter){
+			tmp_tima = 0;
+			timer_counter = timer_modulo;
+			request_interrupt((byte)interrupt_bits::TIMER);
+		} else
+			timer_counter+=inc;
 	}
-
+	if(!stop)
+		divider_reg += ((tmp_div = (tmp_div+1)%256) == 0);
 }
 
 void gbe::mem_t::load_ROM(const char* rom){

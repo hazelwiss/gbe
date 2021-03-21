@@ -7,7 +7,7 @@ int main(){
 	gbe::cpu_t cpu;
 	cpu.create_window();
 	try{
-		cpu.load_ROM("roms/Dr. mario.gb");
+		cpu.load_ROM("roms/testing/mooneye/acceptance/if_ie_registers.gb");
 	}
 	catch(gbe::gbe_error e){
 		printf("Error reading from file! %d\n", e);

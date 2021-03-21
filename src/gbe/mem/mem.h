@@ -40,6 +40,7 @@ namespace gbe{
 		byte read_byte_from_memory(word adr);
 		void write_word_to_memory(word adr, word value);
 		word read_word_from_memory(word adr);
+		void increment_timer(bool stop);
 		void set_interrupt_flag(byte val){
 			this->interrupt_flag = val;
 		}
@@ -71,7 +72,6 @@ namespace gbe{
 		bool get_boot_rom_mount_status(){
 			return is_boot_rom_mounted;
 		}
-		void increment_timer(unsigned long long int& cycles);
 		void request_interrupt(byte interrupt){
 			this->interrupt_flag |= interrupt;
 		}
